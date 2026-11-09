@@ -1,0 +1,93 @@
+/* Lógico_1: */
+
+CREATE TABLE USUARIO (
+    id_usuario INTEGER PRIMARY KEY,
+    nome VARCHAR,
+    senha VARCHAR,
+    tema_preferido VARCHAR
+);
+
+CREATE TABLE VEICULO (
+    id_veiculo INTEGER PRIMARY KEY,
+    placa VARCHAR,
+    modelo VARCHAR,
+    ano INTEGER,
+    capacidade INTEGER,
+    status VARCHAR,
+    km_atual INTEGER,
+    km_proxima_troca INTEGER
+);
+
+CREATE TABLE DOCUMENTO_VEICULAR (
+    id_documento INTEGER PRIMARY KEY,
+    tipo_documento VARCHAR,
+    data_vencimento DATE,
+    valor_pago DECIMAL,
+    observacao VARCHAR,
+    FK_VEICULO_id_veiculo INTEGER
+);
+
+CREATE TABLE MOTORISTA (
+    id_motorista INTEGER PRIMARY KEY,
+    nome_completo VARCHAR,
+    numero_cnh VARCHAR,
+    categoria_cnh VARCHAR,
+    validade_cnh DATE,
+    status_cnh VARCHAR
+);
+
+CREATE TABLE CLIENTE (
+    id_cliente INTEGER PRIMARY KEY,
+    nome_empresa VARCHAR,
+    nome_contato VARCHAR,
+    telefone VARCHAR,
+    observacao VARCHAR,
+    status VARCHAR
+);
+
+CREATE TABLE MANUTENCAO (
+    id_manutencao INTEGER PRIMARY KEY,
+    data_servico DATE,
+    tipo_servico VARCHAR,
+    oficina_observacao VARCHAR,
+    custo DECIMAL,
+    status VARCHAR,
+    FK_VEICULO_id_veiculo INTEGER
+);
+
+CREATE TABLE ROTA (
+    id_rota INTEGER PRIMARY KEY,
+    data_rota DATE,
+    periodo VARCHAR,
+    horario_inicio TIME,
+    horario_fim TIME,
+    status VARCHAR,
+    FK_CLIENTE_id_cliente INTEGER,
+    FK_MOTORISTA_id_motorista INTEGER,
+    FK_VEICULO_id_veiculo INTEGER
+);
+ 
+ALTER TABLE DOCUMENTO_VEICULAR ADD CONSTRAINT FK_DOCUMENTO_VEICULAR_2
+    FOREIGN KEY (FK_VEICULO_id_veiculo)
+    REFERENCES VEICULO (id_veiculo)
+    ON DELETE RESTRICT;
+ 
+ALTER TABLE MANUTENCAO ADD CONSTRAINT FK_MANUTENCAO_2
+    FOREIGN KEY (FK_VEICULO_id_veiculo)
+    REFERENCES VEICULO (id_veiculo)
+    ON DELETE RESTRICT;
+ 
+ALTER TABLE ROTA ADD CONSTRAINT FK_ROTA_2
+    FOREIGN KEY (FK_CLIENTE_id_cliente)
+    REFERENCES CLIENTE (id_cliente)
+    ON DELETE CASCADE;
+ 
+ALTER TABLE ROTA ADD CONSTRAINT FK_ROTA_3
+    FOREIGN KEY (FK_MOTORISTA_id_motorista)
+    REFERENCES MOTORISTA (id_motorista)
+    ON DELETE CASCADE;
+ 
+ALTER TABLE ROTA ADD CONSTRAINT FK_ROTA_4
+    FOREIGN KEY (FK_VEICULO_id_veiculo)
+    REFERENCES VEICULO (id_veiculo)
+    ON DELETE CASCADE;
