@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LM Transportes & Locações - Painel Operacional</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- BARRA DE NAVEGAÇÃO SUPERIOR -->
+    <header class="top-navbar">
+        <div class="brand-area">
+            <img src="logo.png" alt="LM Transportes" onerror="this.style.display='none'; document.getElementById('logoFallback').style.display='block';">
+            <span id="logoFallback" class="brand-fallback" style="display:none;">LM TRANSPORTES</span>
+        </div>
+
+        <nav class="nav-menu">
+            <button class="nav-item active" data-tab="inicio">⊞ Início</button>
+            <button class="nav-item" data-tab="frota">🚐 Frota de veículos</button>
+            <button class="nav-item" data-tab="motoristas">👤 Motoristas</button>
+            <button class="nav-item" data-tab="clientes">🏢 Clientes</button>
+            <button class="nav-item" data-tab="rotas">⇄ Rotas</button>
+            <button class="nav-item" data-tab="manutencoes">🔧 Manutenções</button>
+            <button class="nav-item" data-tab="relatorios">📊 Relatórios</button>
+        </nav>
+
+        <div class="user-area">
+            <div class="user-text">
+                <strong id="userNameDisplay">Lucas Mendes</strong>
+                <span>Proprietário</span>
+            </div>
+            <div class="avatar-lm">LM</div>
+            <button id="logoutBtn" class="icon-btn" title="Sair do painel">⇥</button>
+        </div>
+    </header>
+
+    <!-- SUB-BARRA DE CONTEXTO E NOTIFICAÇÕES -->
+    <div class="sub-header">
+        <div class="sub-header-left">
+            <h2 id="subHeaderTitle">Painel operacional</h2>
+            <p id="currentDateText">Sábado, 07 De Novembro</p>
+        </div>
+
+        <div class="sub-header-right">
+            <div class="greeting-box">
+                <strong>Olá, Lucas</strong>
+                <span>Tenha um ótimo dia</span>
+            </div>
+
+            <div class="theme-pill">
+                <span style="color: var(--text-muted);">Tema</span>
+                <select id="themeSelect">
+                    <option value="claro">Claro</option>
+                    <option value="lm">Tema LM</option>
+                    <option value="escuro">Escuro</option>
+                </select>
+            </div>
+
+            <div class="notif-wrapper">
+                <button id="notifBtn" class="icon-btn" title="Notificações">
+                    🔔
+                    <span id="notifCount" class="notif-badge">3</span>
+                </button>
+                <div id="notifDropdown" class="notif-dropdown">
+                    <h4>Notificações operacionais</h4>
+                    <div id="notifList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="main-container">
+
+        <!-- ==================== ABA 1: INÍCIO (DASHBOARD) ==================== -->
+        <section id="tab-inicio" class="tab-section active">
+            <div class="section-top">
+                <div>
+                    <h1>Visão geral da operação</h1>
+                    <p>Acompanhe os indicadores mais importantes da sua frota.</p>
+                </div>
+                <button class="btn-primary" onclick="abrirModalRota()">+ Nova rota</button>
+            </div>
+
+            <div class="alert-banner" id="dashAlertBanner">
+                <div class="alert-banner-left">
+                    <div class="alert-icon-box">⚠</div>
+                    <div>
+                        <h4>Atenção necessária</h4>
+                        <p id="dashAlertText">2 motoristas com CNH próxima do vencimento e 1 veículo com revisão pendente.</p>
+                    </div>
+                </div>
+                <button class="alert-link" onclick="navegarPara('motoristas')">Ver alertas ›</button>
+            </div>
+
+            <!-- KPIs Principais -->
+            <div class="grid-3">
+                <div class="card">
+                    <div class="kpi-card-top">
+                        <div class="kpi-icon green">🚐</div>
+                        <div>
+                            <div class="kpi-label">Veículos disponíveis</div>
+                            <div class="kpi-value" id="dashVeiculosDisp">8 de 10</div>
+                        </div>
+                    </div>
+                    <div class="kpi-sub" id="dashVeiculosManut">2 veículos em manutenção</div>
+                </div>
+
+                <div class="card">
+                    <div class="kpi-card-top">
+                        <div class="kpi-icon blue">⇄</div>
+                        <div>
+                            <div class="kpi-label">Rotas hoje</div>
+                            <div class="kpi-value" id="dashRotasHoje">12 rotas</div>
+                        </div>
+                    </div>
+                    <div class="kpi-sub" id="dashRotasSub">4 em andamento · 8 agendadas</div>
+                </div>
+
+                <div class="card">
+                    <div class="kpi-card-top">
+                        <div class="kpi-icon orange">💳</div>
+                        <div>
+                            <div class="kpi-label">Manutenção no mês</div>
+                            <div class="kpi-value" id="dashGastoMes">R$ 7.730</div>
+                        </div>
+                    </div>
+                    <div class="kpi-sub">12% menor que no mês anterior</div>
+                </div>
+            </div>
+
+            <!-- Gráficos do Dashboard -->
+            <div class="grid-3">
+                <!-- Disponibilidade -->
+                <div class="card">
+                    <div class="chart-header">
+                        <div>
+                            <h3>Disponibilidade da frota</h3>
+                            <p id="dashSitFrota">Situação atual dos 10 veículos</p>
+                        </div>
+                        <button class="ver-link" onclick="navegarPara('frota')">Ver ›</button>
+                    </div>
+                    <div class="donut-wrap">
+                        <div class="donut-ring" id="dashDonutRing">
+                            <div class="donut-hole">
+                                <strong id="dashDonutPct">80%</strong>
+                                <span>disponível</span>
+                            </div>
+                        </div>
+                        <div class="donut-legend">
+                            <div class="legend-row">
+                                <span><i class="dot green"></i>Disponíveis</span>
+                                <strong id="dashLegDisp">8</strong>
+                            </div>
+                            <div class="legend-row">
+                                <span><i class="dot orange"></i>Manutenção</span>
+                                <strong id="dashLegManut">2</strong>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-footer-note green">
+                        <span>Capacidade suficiente para as rotas programadas hoje.</span>
+                    </div>
+                </div>
+
+                <!-- Distribuição de Rotas -->
+                <div class="card">
+                    <div class="chart-header">
+                        <div>
+                            <h3>Distribuição das rotas</h3>
+                            <p>Volume por faixa de horário</p>
+                        </div>
+                        <button class="ver-link" onclick="navegarPara('rotas')">Ver ›</button>
+                    </div>
+                    <div class="bars-container">
+                        <div class="bar-col">
+                            <span class="bar-val">2</span>
+                            <div class="bar-fill" style="height: 42px;"></div>
+                            <span class="bar-label">06–09</span>
+                        </div>
+                        <div class="bar-col">
+                            <span class="bar-val">4</span>
+                            <div class="bar-fill highlight" style="height: 85px;"></div>
+                            <span class="bar-label">09–12</span>
+                        </div>
+                        <div class="bar-col">
+                            <span class="bar-val">3</span>
+                            <div class="bar-fill" style="height: 64px;"></div>
+                            <span class="bar-label">12–15</span>
+                        </div>
+                        <div class="bar-col">
+                            <span class="bar-val">2</span>
+                            <div class="bar-fill" style="height: 42px;"></div>
+                            <span class="bar-label">15–18</span>
+                        </div>
+                        <div class="bar-col">
+                            <span class="bar-val">1</span>
+                            <div class="bar-fill" style="height: 22px;"></div>
+                            <span class="bar-label">18–21</span>
+                        </div>
+                    </div>
+                    <div class="chart-footer-note blue">
+                        <span>Pico entre 09h e 12h</span>
+                        <strong>• 4 em andamento</strong>
+                    </div>
+                </div>
+
+                <!-- Custos de Manutenção -->
+                <div class="card">
+                    <div class="chart-header">
+                        <div>
+                            <h3>Custos de manutenção</h3>
+                            <p>Evolução dos últimos 4 meses</p>
+                        </div>
+                        <button class="ver-link" onclick="navegarPara('manutencoes')">Ver ›</button>
+                    </div>
+                    <div class="cost-pillars">
+                        <div class="cost-pillar-item">
+                            <strong>R$ 6,2k</strong>
+                            <div class="cost-pillar-box"><div class="cost-pillar-inner" style="height: 55%;"></div></div>
+                            <span>Jun</span>
+                        </div>
+                        <div class="cost-pillar-item">
+                            <strong>R$ 8,9k</strong>
+                            <div class="cost-pillar-box"><div class="cost-pillar-inner" style="height: 85%;"></div></div>
+                            <span>Jul</span>
+                        </div>
+                        <div class="cost-pillar-item">
+                            <strong>R$ 8,7k</strong>
+                            <div class="cost-pillar-box"><div class="cost-pillar-inner" style="height: 80%;"></div></div>
+                            <span>Ago</span>
+                        </div>
+                        <div class="cost-pillar-item">
+                            <strong id="dashPilarSet">R$ 7,7k</strong>
+                            <div class="cost-pillar-box"><div class="cost-pillar-inner active" style="height: 70%;"></div></div>
+                            <span>Set</span>
+                        </div>
+                    </div>
+                    <div class="chart-footer-note orange">
+                        <div>
+                            <small style="display:block; font-size:11px;">Custo em setembro</small>
+                            <strong id="dashFooterCusto" style="font-size:14px;">R$ 7.730</strong>
+                        </div>
+                        <span class="badge green">↓ 12% no mês</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== ABA 2: FROTA DE VEÍCULOS ==================== -->
+        <section id="tab-frota" class="tab-section">
+            <div class="section-top">
+                <div>
+                    <h1>Gestão da frota</h1>
+                    <p>Cadastre, acompanhe e gerencie todos os veículos.</p>
+                </div>
+                <button class="btn-primary" onclick="abrirModalVeiculo()">+ Novo veículo</button>
+            </div>
+
+            <div class="grid-3">
+                <div class="card stat-strip">
+                    <span>Total de veículos</span>
+                    <strong id="frotaTotal">10</strong>
+                </div>
+                <div class="card stat-strip">
+                    <span>Disponíveis</span>
+                    <strong id="frotaDisp" style="color: var(--success);">8</strong>
+                </div>
+                <div class="card stat-strip">
+                    <span>Em manutenção</span>
+                    <strong id="frotaManut" style="color: var(--warning);">2</strong>
+                </div>
+            </div>
+
+            <div class="filter-bar">
+                <div class="search-input-wrap">
+                    <span>🔍</span>
+                    <input type="text" id="searchFrota" placeholder="Buscar por placa, modelo ou nome...">
+                </div>
+                <select id="filterStatusFrota" class="filter-select">
+                    <option value="Todos">Todos (Frota atual)</option>
+                    <option value="Disponível">Disponível</option>
+                    <option value="Em manutenção">Em manutenção</option>
+                    <option value="Em rota">Em rota</option>
+                    <option value="Inativo">Inativo</option>
+                    <option value="Vendido">Vendido</option>
+                </select>
+            </div>
+
+            <div class="table-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>PLACA</th>
+                            <th>MODELO</th>
+                            <th>ANO</th>
+                            <th>CAPACIDADE</th>
+                            <th>STATUS</th>
+                            <th>REGISTROS</th>
+                            <th>AÇÕES</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaFrotaBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ==================== ABA 3: MOTORISTAS ==================== -->
+        <section id="tab-motoristas" class="tab-section">
+            <div class="section-top">
+                <div>
+                    <h1>Motoristas</h1>
+                    <p>Controle de habilitações e disponibilidade da equipe.</p>
+                </div>
+                <button class="btn-primary" onclick="abrirModalMotorista()">+ Novo motorista</button>
+            </div>
+
+            <div class="grid-3">
+                <div class="card stat-strip">
+                    <span>Motoristas ativos</span>
+                    <strong id="motTotal">12</strong>
+                </div>
+                <div class="card stat-strip">
+                    <span>CNH em alerta</span>
+                    <strong id="motAlerta" style="color: var(--warning);">2</strong>
+                </div>
+                <div class="card stat-strip">
+                    <span>CNH vencida</span>
+                    <strong id="motVencida" style="color: var(--danger);">1</strong>
+                </div>
+            </div>
+
+            <div class="filter-bar">
+                <div class="search-input-wrap">
+                    <span>🔍</span>
+                    <input type="text" id="searchMotorista" placeholder="Buscar por nome ou número da CNH...">
+                </div>
+                <span class="badge red" id="motAttentionBadge">• 3 habilitações requerem atenção</span>
+            </div>
+
+            <div class="table-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>MOTORISTA</th>
+                            <th>CNH</th>
+                            <th>CATEGORIA</th>
+                            <th>VALIDADE</th>
+                            <th>STATUS DA HABILITAÇÃO</th>
+                            <th>AÇÕES</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaMotoristasBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ==================== ABA 4: CLIENTES CORPORATIVOS ==================== -->
+        <section id="tab-clientes" class="tab-section">
+            <div class="section-top">
+                <div>
+                    <h1>Clientes corporativos</h1>
+                    <p>Empresas atendidas e histórico de relacionamento.</p>
+                </div>
+                <button class="btn-primary" onclick="abrirModalCliente()">+ Novo cliente</button>
+            </div>
+
+            <div class="filter-bar">
+                <div class="search-input-wrap">
+                    <span>🔍</span>
+                    <input type="text" id="searchCliente" placeholder="Buscar por empresa, contato ou telefone...">
+                </div>
+            </div>
+
+            <div class="clients-grid" id="clientesGrid"></div>
+        </section>
+
+        <!-- ==================== ABA 5: ROTAS ==================== -->
+        <section id="tab-rotas" class="tab-section">
+            <div class="section-top">
+                <div>
+                    <h1>Rotas</h1>
+                    <p>Acompanhe as viagens do dia e faça a vinculação segura dos recursos.</p>
+                </div>
+                <button class="btn-primary" onclick="abrirModalRota()">+ Nova rota</button>
+            </div>
+
+            <div class="grid-2">
+                <div class="card stat-strip">
+                    <span>Rotas hoje</span>
+                    <strong id="rotasTotalCount">4</strong>
+                </div>
+                <div class="card stat-strip">
+                    <span>Em andamento</span>
+                    <strong id="rotasAndamentoCount" style="color: var(--success);">3</strong>
+                </div>
+            </div>
+
+            <div class="table-card">
+                <div style="text-align: center; padding: 18px; border-bottom: 1px solid var(--border);">
+                    <strong style="font-size: 13px; letter-spacing: 0.5px;">ROTAS DO DIA</strong>
+                    <p style="font-size: 11.5px; color: var(--text-muted);">28 de setembro de 2026</p>
+                </div>
+                <div id="listaRotasContainer"></div>
+            </div>
+        </section>
+
+        <!-- ==================== ABA 6: MANUTENÇÕES ==================== -->
+        <section id="tab-manutencoes" class="tab-section">
+            <div class="section-top">
+                <div>
+                    <h1>Manutenções</h1>
+                    <p>Histórico de serviços, custos e manutenções preventivas.</p>
+                </div>
+                <button class="btn-primary" onclick="abrirModalManutencao()">+ Registrar serviço</button>
+            </div>
+
+            <div class="grid-3">
+                <div class="card">
+                    <div class="kpi-card-top">
+                        <div class="kpi-icon orange">💳</div>
+                        <div>
+                            <div class="kpi-label">Gasto no mês</div>
+                            <div class="kpi-value" id="manutGastoTotal">R$ 7.730</div>
+                        </div>
+                    </div>
+                    <div class="kpi-sub">-12% comparado a agosto</div>
+                </div>
+                <div class="card">
+                    <div class="kpi-card-top">
+                        <div class="kpi-icon blue">🔧</div>
+                        <div>
+                            <div class="kpi-label">Serviços realizados</div>
+                            <div class="kpi-value" id="manutQtdTotal">14</div>
+                        </div>
+                    </div>
+                    <div class="kpi-sub" id="manutQtdSub">11 concluídos · 3 abertos</div>
+                </div>
+                <div class="card">
+                    <div class="kpi-card-top">
+                        <div class="kpi-icon green">🚐</div>
+                        <div>
+                            <div class="kpi-label">Custo por veículo</div>
+                            <div class="kpi-value" id="manutCustoMedio">R$ 773</div>
+                        </div>
+                    </div>
+                    <div class="kpi-sub">Média mensal da frota</div>
+                </div>
+            </div>
+
+            <!-- NOVA BARRA DE PESQUISA POR CÓDIGO/PLACA E FILTRO DE STATUS -->
+            <div class="filter-bar">
+                <div class="search-input-wrap">
+                    <span>🔍</span>
+                    <input type="text" id="searchManutencao" placeholder="Buscar por código (ex: 1), placa, tipo de serviço ou oficina...">
+                </div>
+                <select id="filterStatusManutencao" class="filter-select">
+                    <option value="Pendentes">Em aberto (Ocultar concluídos)</option>
+                    <option value="Agendado">Apenas Agendado</option>
+                    <option value="Em andamento">Apenas Em andamento</option>
+                    <option value="Concluído">Apenas Concluído</option>
+                    <option value="Todos">Todos os registros</option>
+                </select>
+            </div>
+
+            <div class="table-card">
+                <div style="padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h3 style="font-size: 14.5px; font-weight: 700;">Histórico de serviços</h3>
+                        <p style="font-size: 12px; color: var(--text-muted);">Clique no código ou no status de um registro para editar ou alterar a situação</p>
+                    </div>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>VEÍCULO</th>
+                            <th>CÓDIGO</th>
+                            <th>DATA</th>
+                            <th>TIPO DE SERVIÇO</th>
+                            <th>OFICINA / OBSERVAÇÃO</th>
+                            <th>CUSTO</th>
+                            <th>STATUS</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaManutencoesBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ==================== ABA 7: RELATÓRIOS ==================== -->
+        <section id="tab-relatorios" class="tab-section">
+            <div class="section-top">
+                <div>
+                    <h1>Relatórios gerenciais</h1>
+                    <p>Analise custos, utilização e desempenho da operação.</p>
+                </div>
+            </div>
+
+            <div class="grid-3">
+                <div class="card">
+                    <div class="kpi-card-top">
+                        <div class="kpi-icon orange">💳</div>
+                        <div>
+                            <div class="kpi-label">Gasto no mês</div>
+                            <div class="kpi-value" id="relGastoTotal">R$ 7.730</div>
+                        </div>
+                    </div>
+                    <div class="kpi-sub">-12% comparado a agosto</div>
+                </div>
+                <div class="card">
+                    <div class="kpi-card-top">
+                        <div class="kpi-icon blue">🔧</div>
+                        <div>
+                            <div class="kpi-label">Serviços realizados</div>
+                            <div class="kpi-value" id="relServicosTotal">14</div>
+                        </div>
+                    </div>
+                    <div class="kpi-sub">11 concluídos · 3 abertos</div>
+                </div>
+                <div class="card">
+                    <div class="kpi-card-top">
+                        <div class="kpi-icon green">🚐</div>
+                        <div>
+                            <div class="kpi-label">Custo por veículo</div>
+                            <div class="kpi-value" id="relCustoMedio">R$ 773</div>
+                        </div>
+                    </div>
+                    <div class="kpi-sub">Média mensal da frota</div>
+                </div>
+            </div>
+
+            <div class="grid-3">
+                <!-- Evolução 3 meses -->
+                <div class="card">
+                    <div class="chart-header">
+                        <div>
+                            <h3>Custos de manutenção</h3>
+                            <p>Evolução nos últimos 3 meses</p>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 28px; text-align: center;">
+                        <div>
+                            <div style="height: 90px; background: #EFF6FF; border-radius: 8px; display:flex; align-items:flex-end;">
+                                <div style="width:100%; height: 75%; background: var(--navy); border-radius: 6px;"></div>
+                            </div>
+                            <small style="display:block; margin-top:8px; color:var(--text-muted);">Jul</small>
+                        </div>
+                        <div>
+                            <div style="height: 90px; background: #EFF6FF; border-radius: 8px; display:flex; align-items:flex-end;">
+                                <div style="width:100%; height: 70%; background: var(--navy); border-radius: 6px;"></div>
+                            </div>
+                            <small style="display:block; margin-top:8px; color:var(--text-muted);">Ago</small>
+                        </div>
+                        <div>
+                            <div style="height: 90px; background: #EFF6FF; border-radius: 8px; display:flex; align-items:flex-end;">
+                                <div style="width:100%; height: 58%; background: var(--navy); border-radius: 6px;"></div>
+                            </div>
+                            <small style="display:block; margin-top:8px; color:var(--text-muted);">Set</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Validades CNH -->
+                <div class="card">
+                    <div class="chart-header">
+                        <div>
+                            <h3>Validades CNH</h3>
+                            <p>Situação dos motoristas cadastrados</p>
+                        </div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap: 10px;">
+                        <div class="chart-footer-note green">
+                            <strong>Regulares</strong>
+                            <span id="relCnhReg">• 2 motoristas</span>
+                        </div>
+                        <div class="chart-footer-note orange">
+                            <strong>Próximas do vencimento</strong>
+                            <span id="relCnhAlert">• 2 motoristas</span>
+                        </div>
+                        <div class="chart-footer-note" style="background: var(--danger-bg); color: #991B1B;">
+                            <strong>Vencidas</strong>
+                            <span id="relCnhVenc">• 1 motorista</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Custos por Categoria -->
+                <div class="card">
+                    <div class="chart-header">
+                        <div>
+                            <h3>Custos por categoria</h3>
+                        </div>
+                    </div>
+                    <div class="progress-group">
+                        <div class="progress-label"><span>Pneus</span><span id="pctPneus">42%</span></div>
+                        <div class="progress-track"><div id="barPneus" class="progress-bar" style="width: 42%; background: var(--blue-light);"></div></div>
+                    </div>
+                    <div class="progress-group">
+                        <div class="progress-label"><span>Freios</span><span id="pctFreios">32%</span></div>
+                        <div class="progress-track"><div id="barFreios" class="progress-bar" style="width: 32%; background: var(--navy);"></div></div>
+                    </div>
+                    <div class="progress-group">
+                        <div class="progress-label"><span>Preventiva</span><span id="pctPrev">26%</span></div>
+                        <div class="progress-track"><div id="barPrev" class="progress-bar" style="width: 26%; background: var(--success);"></div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-card">
+                <div style="padding: 18px 20px; border-bottom: 1px solid var(--border);">
+                    <h3 style="font-size: 14.5px; font-weight: 700;">Histórico de serviços</h3>
+                    <p style="font-size: 12px; color: var(--text-muted);">Todos os registros de manutenção da frota</p>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>VEÍCULO</th>
+                            <th>CÓDIGO</th>
+                            <th>DATA</th>
+                            <th>TIPO DE SERVIÇO</th>
+                            <th>OFICINA / OBSERVAÇÃO</th>
+                            <th>CUSTO</th>
+                            <th>STATUS</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaRelatoriosBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ==================== MODAL GENÉRICO DINÂMICO ==================== -->
+    <div id="modalOverlay" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modalTitle">Título</h3>
+                <button class="close-modal" onclick="fecharModal()">×</button>
+            </div>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,1195 @@
+
+// Data real sincronizada com o relógio do computador
+function obterDataHojeReal() {
+    const agora = new Date();
+    return new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 12, 0, 0);
+}
+
+function obterDataHojeISO() {
+    const agora = new Date();
+    const ano = agora.getFullYear();
+    const mes = String(agora.getMonth() + 1).padStart(2, '0');
+    const dia = String(agora.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+}
+
+function atualizarRelogioCabecalho() {
+    const agora = new Date();
+    const opcoes = { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' };
+    const formatada = agora.toLocaleDateString('pt-BR', opcoes);
+    // Deixa a primeira letra maiúscula (ex: "Domingo, 08 de novembro de 2026")
+    const textoFinal = formatada.charAt(0).toUpperCase() + formatada.slice(1);
+
+    const elData = document.getElementById('currentDateText');
+    if (elData) elData.textContent = textoFinal;
+
+    const elDataRotas = document.getElementById('rotasDateSub');
+    if (elDataRotas) elDataRotas.textContent = textoFinal;
+
+    // Saudação dinâmica conforme o horário
+    const hora = agora.getHours();
+    const saudacao = hora < 12 ? 'Tenha um ótimo dia' : (hora < 18 ? 'Tenha uma ótima tarde' : 'Tenha uma ótima noite');
+    const elSaudacao = document.querySelector('.greeting-box span');
+    if (elSaudacao) elSaudacao.textContent = saudacao;
+}
+
+// Estado Global
+let state = {
+    veiculos: [],
+    motoristas: [],
+    clientes: [],
+    rotas: [],
+    manutencoes: []
+};
+
+// Dados Iniciais Completos (10 veículos como nos prints do Figma)
+const fallbackData = {
+    veiculos: [
+        { id: 1, placa: 'QWE-4D21', modelo: 'Mercedes Sprinter 417', ano: 2023, capacidade: '15 passageiros', status: 'Disponível',
+          documentos: { ipva: { vencimento: '2026-10-15', valor: 3200, obs: 'Cota única' }, licenciamento: { vencimento: '2026-11-30', valor: 160, obs: '' }, spvat: { vencimento: '2026-10-15', valor: 120, obs: '' }, selo: { vencimento: '2026-12-10', valor: 250, obs: '' } },
+          km: { atual: 45200, dataConferencia: '2026-09-25', proxTrocaOleo: 50000, obs: 'Regular' } },
+        { id: 2, placa: 'RTA-8F02', modelo: 'Renault Master L3H2', ano: 2022, capacidade: '16 passageiros', status: 'Em manutenção',
+          documentos: { ipva: { vencimento: '2026-11-03', valor: 2900, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
+          km: { atual: 68900, dataConferencia: '2026-09-20', proxTrocaOleo: 68000, obs: 'Revisão pendente' } },
+        { id: 3, placa: 'LMN-2G89', modelo: 'Fiat Ducato Minibus', ano: 2024, capacidade: '17 passageiros', status: 'Disponível',
+          documentos: { ipva: { vencimento: '', valor: 0, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
+          km: { atual: 18400, dataConferencia: '2026-09-22', proxTrocaOleo: 25000, obs: '' } },
+        { id: 4, placa: 'BXD-7A14', modelo: 'Ford Transit 410', ano: 2021, capacidade: '14 passageiros', status: 'Em rota',
+          documentos: { ipva: { vencimento: '2026-12-28', valor: 2650, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
+          km: { atual: 82100, dataConferencia: '2026-09-28', proxTrocaOleo: 90000, obs: '' } },
+        { id: 5, placa: 'HJK-9C33', modelo: 'Volkswagen Crafter', ano: 2020, capacidade: '16 passageiros', status: 'Inativo',
+          documentos: { ipva: { vencimento: '', valor: 0, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
+          km: { atual: 112000, dataConferencia: '2026-08-15', proxTrocaOleo: 120000, obs: '' } },
+        { id: 6, placa: 'KLP-3B72', modelo: 'Iveco Daily Minibus', ano: 2023, capacidade: '16 passageiros', status: 'Disponível',
+          documentos: { ipva: { vencimento: '2027-01-18', valor: 3100, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
+          km: { atual: 34000, dataConferencia: '2026-09-18', proxTrocaOleo: 40000, obs: '' } },
+        { id: 7, placa: 'MNO-6E41', modelo: 'Mercedes Sprinter 416', ano: 2024, capacidade: '15 passageiros', status: 'Disponível',
+          documentos: { ipva: { vencimento: '', valor: 0, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
+          km: { atual: 12300, dataConferencia: '2026-09-25', proxTrocaOleo: 20000, obs: '' } },
+        { id: 8, placa: 'PQR-1A99', modelo: 'Mercedes Sprinter 517', ano: 2024, capacidade: '18 passageiros', status: 'Disponível',
+          documentos: { ipva: { vencimento: '2027-02-10', valor: 3500, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
+          km: { atual: 9500, dataConferencia: '2026-09-27', proxTrocaOleo: 15000, obs: '' } },
+        { id: 9, placa: 'STU-4B22', modelo: 'Renault Master Minibus', ano: 2023, capacidade: '16 passageiros', status: 'Disponível',
+          documentos: { ipva: { vencimento: '2027-03-05', valor: 2950, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
+          km: { atual: 27400, dataConferencia: '2026-09-20', proxTrocaOleo: 35000, obs: '' } },
+        { id: 10, placa: 'VWX-8C55', modelo: 'Fiat Ducato Executiva', ano: 2022, capacidade: '15 passageiros', status: 'Em manutenção',
+          documentos: { ipva: { vencimento: '2026-12-12', valor: 2800, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
+          km: { atual: 54000, dataConferencia: '2026-09-15', proxTrocaOleo: 60000, obs: '' } }
+    ],
+    motoristas: [
+        { id: 1, nome: 'Carlos Eduardo Lima', cnh: '08945123760', categoria: 'D', validade: '2028-08-18' },
+        { id: 2, nome: 'Márcia Vieira Souza', cnh: '05478321908', categoria: 'D', validade: '2026-10-02' },
+        { id: 3, nome: 'João Marcos Reis', cnh: '07321654892', categoria: 'E', validade: '2026-10-12' },
+        { id: 4, nome: 'Paulo Henrique Alves', cnh: '09123654788', categoria: 'C', validade: '2029-05-24' },
+        { id: 5, nome: 'André Luiz Costa', cnh: '04652139877', categoria: 'D', validade: '2026-09-21' }
+    ],
+    clientes: [
+        { id: 1, empresa: 'Grupo Horizonte', iniciais: 'GH', contato: 'Ana Martins', telefone: '(11) 98765-4321', obs: 'Contrato corporativo padrão', status: 'Ativo', rotasRealizadas: 34 },
+        { id: 2, empresa: 'Instituto Ideal', iniciais: 'II', contato: 'Ricardo Sales', telefone: '(11) 3456-7890', obs: 'Rotas matutinas e vespertinas', status: 'Ativo', rotasRealizadas: 18 },
+        { id: 3, empresa: 'Construtora Vértice', iniciais: 'CV', contato: 'Beatriz Rocha', telefone: '(21) 99876-1204', obs: 'Engenharia e obras', status: 'Ativo', rotasRealizadas: 27 },
+        { id: 4, empresa: 'BioSaúde', iniciais: 'BS', contato: 'Marcos Nunes', telefone: '(31) 3344-5566', obs: 'Laboratórios', status: 'Inativo', rotasRealizadas: 12 }
+    ],
+    rotas: [
+        { id: 1, clienteId: 1, veiculoId: 1, motoristaId: 1, data: '2026-09-28', periodo: 'Manhã', horaInicio: '08:00', horaFim: '10:00', status: 'Em andamento' },
+        { id: 2, clienteId: 2, veiculoId: 3, motoristaId: 2, data: '2026-09-28', periodo: 'Manhã', horaInicio: '10:30', horaFim: '12:30', status: 'Em andamento' },
+        { id: 3, clienteId: 3, veiculoId: 4, motoristaId: 3, data: '2026-09-28', periodo: 'Tarde', horaInicio: '13:45', horaFim: '15:30', status: 'Em andamento' },
+        { id: 4, clienteId: 4, veiculoId: 5, motoristaId: 4, data: '2026-09-28', periodo: 'Noite', horaInicio: '18:00', horaFim: '20:00', status: 'Finalizada' }
+    ],
+    manutencoes: [
+        { id: 1, codigo: 1, veiculoId: 2, placa: 'RTA-8F02', data: '2026-09-26', tipo: 'Sistema de freios', oficina: 'Auto Center Norte', obs: '', custo: 2480, status: 'Em andamento' },
+        { id: 2, codigo: 2, veiculoId: 1, placa: 'QWE-4D21', data: '2026-09-18', tipo: 'Troca de óleo', oficina: 'Oficina Avenida', obs: '', custo: 690, status: 'Concluído' },
+        { id: 3, codigo: 3, veiculoId: 5, placa: 'HJK-9C33', data: '2026-09-12', tipo: 'Pneus', oficina: 'Pneus Brasil', obs: 'Substituição dos pneus dianteiros.', custo: 3220, status: 'Concluído' },
+        { id: 4, codigo: 4, veiculoId: 3, placa: 'LMN-2G89', data: '2026-09-04', tipo: 'Preventiva', oficina: 'Fiat Pro', obs: 'Revisão preventiva completa.', custo: 1340, status: 'Concluído' }
+    ]
+};
+
+// Inicialização
+document.addEventListener('DOMContentLoaded', async () => {
+    if (!localStorage.getItem('lm_token')) {
+        window.location.href = '/index.html';
+        return;
+    }
+
+    const userName = localStorage.getItem('lm_user') || 'Lucas Mendes';
+    document.getElementById('userNameDisplay').textContent = userName;
+    
+    configurarTemas();
+    configurarNavegacao();
+    configurarFiltros();
+
+    await carregarDados();
+    renderizarTudo();
+});
+    //CLOCK
+    const userName = localStorage.getItem('lm_user') || 'Lucas Mendes';
+    document.getElementById('userNameDisplay').textContent = userName;
+
+    atualizarRelogioCabecalho();
+    setInterval(atualizarRelogioCabecalho, 60000); // Atualiza a cada 1 minuto
+
+async function carregarDados() {
+    const salvoLocal = localStorage.getItem('lm_state_v1');
+    if (salvoLocal) {
+        state = JSON.parse(salvoLocal);
+        return;
+    }
+    try {
+        const res = await fetch('/api/dados');
+        const serverData = await res.json();
+        if (serverData && serverData.veiculos && serverData.veiculos.length >= 10) {
+            state = serverData;
+        } else {
+            state = fallbackData;
+            await salvarEstado();
+        }
+    } catch (e) {
+        state = fallbackData;
+    }
+}
+
+async function salvarEstado() {
+    localStorage.setItem('lm_state_v1', JSON.stringify(state));
+    try {
+        await fetch('/api/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(state)
+        });
+    } catch (e) {
+        console.warn('Salvo em localStorage');
+    }
+}
+
+// Temas
+function configurarTemas() {
+    const themeSelect = document.getElementById('themeSelect');
+    const savedTheme = localStorage.getItem('lm_theme') || 'claro';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    themeSelect.value = savedTheme;
+
+    themeSelect.addEventListener('change', (e) => {
+        const t = e.target.value;
+        document.documentElement.setAttribute('data-theme', t);
+        localStorage.setItem('lm_theme', t);
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        localStorage.removeItem('lm_token');
+        window.location.href = '/index.html';
+    });
+
+    const notifBtn = document.getElementById('notifBtn');
+    const notifDropdown = document.getElementById('notifDropdown');
+    notifBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        notifDropdown.classList.toggle('open');
+    });
+    document.addEventListener('click', () => notifDropdown.classList.remove('open'));
+}
+
+// Navegação SPA
+const titulosAbas = {
+    inicio: 'Painel operacional',
+    frota: 'Frota de veículos',
+    motoristas: 'Motoristas',
+    clientes: 'Clientes corporativos',
+    rotas: 'Rotas',
+    manutencoes: 'Manutenções',
+    relatorios: 'Relatórios'
+};
+
+function configurarNavegacao() {
+    document.querySelectorAll('.nav-item').forEach(btn => {
+        btn.addEventListener('click', () => navegarPara(btn.dataset.tab));
+    });
+}
+
+function navegarPara(tabId) {
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+    document.querySelectorAll('.tab-section').forEach(sec => sec.classList.toggle('active', sec.id === `tab-${tabId}`));
+    document.getElementById('subHeaderTitle').textContent = titulosAbas[tabId] || 'Painel operacional';
+    renderizarTudo();
+}
+
+// Utilitários de Datas e CNH
+function formatarDataBR(isoStr) {
+    if (!isoStr) return '';
+    const [a, m, d] = isoStr.split('-');
+    return `${d}/${m}/${a}`;
+}
+
+function formatarDataCurtaMes(isoStr) {
+    if (!isoStr) return '';
+    const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    const [a, m, d] = isoStr.split('-');
+    return `${d} ${meses[parseInt(m, 10) - 1]} ${a}`;
+}
+
+function calcularDiasCNH(validadeISO) {
+    const val = new Date(validadeISO + 'T12:00:00');
+    const hoje = obterDataHojeReal();
+    return Math.ceil((val - hoje) / (1000 * 60 * 60 * 24));
+}
+
+function obterStatusCNH(validadeISO) {
+    const dias = calcularDiasCNH(validadeISO);
+    if (dias < 0) {
+        return { codigo: 'Vencida', label: `• Vencida`, classe: 'red', rowClass: 'row-risk-danger', bloqueadoRota: true, motivo: 'CNH vencida' };
+    }
+    if (dias <= 5) {
+        return { codigo: 'Alerta', label: `• Vence em ${dias} dias`, classe: 'red', rowClass: 'row-risk-danger', bloqueadoRota: true, motivo: `CNH vence em ${dias} dias (menos de 5 dias)` };
+    }
+    if (dias <= 30) {
+        return { codigo: 'Alerta', label: `• Vence em ${dias} dias`, classe: 'orange', rowClass: 'row-risk-warning', bloqueadoRota: false, motivo: '' };
+    }
+    return { codigo: 'Regular', label: '• Regular', classe: 'green', rowClass: '', bloqueadoRota: false, motivo: '' };
+}
+
+function obterProximoVencimentoVeiculo(v) {
+    if (!v.documentos) return null;
+    const datas = Object.values(v.documentos)
+        .map(d => d.vencimento)
+        .filter(Boolean)
+        .sort();
+    return datas.length > 0 ? datas[0] : null;
+}
+
+// Renderização Geral
+function renderizarTudo() {
+    renderizarNotificacoes();
+    renderizarDashboard();
+    renderizarFrota();
+    renderizarMotoristas();
+    renderizarClientes();
+    renderizarRotas();
+    renderizarManutencoesERelatorios();
+}
+
+// 1. Notificações Clicáveis + Controle Dinâmico do Banner Principal
+function renderizarNotificacoes() {
+    const list = document.getElementById('notifList');
+    const badgeCount = document.getElementById('notifCount');
+    const dashBanner = document.getElementById('dashAlertBanner');
+    const dashAlertText = document.getElementById('dashAlertText');
+    const notificacoes = [];
+
+    let qtdCnh = 0;
+    let qtdVeiculos = 0;
+
+    state.motoristas.forEach(m => {
+        const st = obterStatusCNH(m.validade);
+        if (st.codigo !== 'Regular') {
+            qtdCnh++;
+            notificacoes.push({
+                titulo: `CNH: ${m.nome}`,
+                desc: `${st.label.replace('• ', '')} (${formatarDataBR(m.validade)})`,
+                aba: 'motoristas'
+            });
+        }
+    });
+
+    // Filtra apenas veículos ativos da empresa (não vendidos)
+    const frotaAtiva = state.veiculos.filter(v => v.status !== 'Vendido');
+
+    frotaAtiva.forEach(v => {
+        if (v.km && v.km.atual >= v.km.proxTrocaOleo) {
+            qtdVeiculos++;
+            notificacoes.push({
+                titulo: `Revisão vencida: ${v.placa}`,
+                desc: `KM atual (${v.km.atual}) ultrapassou troca de óleo`,
+                aba: 'frota'
+            });
+        }
+        const proxDoc = obterProximoVencimentoVeiculo(v);
+        if (proxDoc) {
+            const diasDoc = calcularDiasCNH(proxDoc);
+            if (diasDoc <= 30) {
+                qtdVeiculos++;
+                notificacoes.push({
+                    titulo: `Documento (${diasDoc < 0 ? 'Vencido' : 'Próximo'}): ${v.placa}`,
+                    desc: `Vencimento em ${formatarDataBR(proxDoc)}`,
+                    aba: 'frota'
+                });
+            }
+        }
+    });
+
+    // Atualiza o contador do sino
+    badgeCount.textContent = notificacoes.length;
+    badgeCount.style.display = notificacoes.length > 0 ? 'flex' : 'none';
+
+    // Mostra ou esconde o banner do Dashboard conforme existam notificações
+    if (dashBanner) {
+        if (notificacoes.length > 0) {
+            dashBanner.style.display = 'flex';
+            const partesResumo = [];
+            if (qtdCnh > 0) partesResumo.push(`${qtdCnh} motorista(s) com CNH em alerta/vencida`);
+            if (qtdVeiculos > 0) partesResumo.push(`${qtdVeiculos} pendência(s) de veículo/documentação`);
+            dashAlertText.textContent = partesResumo.join(' e ') + '.';
+        } else {
+            dashBanner.style.display = 'none';
+        }
+    }
+
+    list.innerHTML = notificacoes.map(n => `
+        <div class="notif-item" onclick="navegarPara('${n.aba}')">
+            <strong>${n.titulo}</strong>
+            <span>${n.desc}</span>
+        </div>
+    `).join('') || '<p style="padding:10px; font-size:12px; color:var(--text-muted);">Sem alertas pendentes.</p>';
+}
+
+// Abre o menu do sino quando o usuário clica em "Ver alertas ›" no banner
+function abrirNotificacoesPeloBanner(e) {
+    e.stopPropagation();
+    const notifDropdown = document.getElementById('notifDropdown');
+    notifDropdown.classList.add('open');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// 2. Dashboard (Calculado apenas sobre veículos que estão na empresa)
+function renderizarDashboard() {
+    const frotaEmpresa = state.veiculos.filter(v => v.status !== 'Vendido');
+    const totalV = frotaEmpresa.length;
+    const manutV = frotaEmpresa.filter(v => v.status === 'Em manutenção').length;
+    const dispV = totalV - manutV;
+    const pct = totalV > 0 ? Math.round((dispV / totalV) * 100) : 0;
+
+    document.getElementById('dashVeiculosDisp').textContent = `${dispV} de ${totalV}`;
+    document.getElementById('dashVeiculosManut').textContent = `${manutV} veículos em manutenção`;
+    document.getElementById('dashSitFrota').textContent = `Situação atual dos ${totalV} veículos`;
+    document.getElementById('dashDonutPct').textContent = `${pct}%`;
+    document.getElementById('dashDonutRing').style.background = `conic-gradient(var(--success) 0% ${pct}%, #E2E8F0 ${pct}% 100%)`;
+    document.getElementById('dashLegDisp').textContent = dispV;
+    document.getElementById('dashLegManut').textContent = manutV;
+
+    const totalGasto = state.manutencoes.reduce((acc, m) => acc + Number(m.custo || 0), 0);
+    const gastoFormatado = `R$ ${totalGasto.toLocaleString('pt-BR')}`;
+    document.getElementById('dashGastoMes').textContent = gastoFormatado;
+    document.getElementById('dashFooterCusto').textContent = gastoFormatado;
+}
+
+// 3. Frota de Veículos (Oculta "Vendido" em "Todos", exibindo apenas no filtro "Vendido")
+function renderizarFrota() {
+    const busca = (document.getElementById('searchFrota')?.value || '').toLowerCase();
+    const filtroStatus = document.getElementById('filterStatusFrota')?.value || 'Todos';
+
+    // Indicadores superiores contam apenas veículos da frota atual (não vendidos)
+    const frotaEmpresa = state.veiculos.filter(v => v.status !== 'Vendido');
+    const total = frotaEmpresa.length;
+    const manut = frotaEmpresa.filter(v => v.status === 'Em manutenção').length;
+    const disp = total - manut;
+
+    document.getElementById('frotaTotal').textContent = total;
+    document.getElementById('frotaDisp').textContent = disp;
+    document.getElementById('frotaManut').textContent = manut;
+
+    const filtrados = state.veiculos.filter(v => {
+        const matchTexto = v.placa.toLowerCase().includes(busca) || v.modelo.toLowerCase().includes(busca);
+        
+        // Regra principal: "Todos" mostra apenas o que NÃO foi vendido.
+        // "Vendido" mostra exclusivamente os vendidos.
+        let matchStatus = false;
+        if (filtroStatus === 'Todos') {
+            matchStatus = v.status !== 'Vendido';
+        } else {
+            matchStatus = v.status === filtroStatus;
+        }
+
+        return matchTexto && matchStatus;
+    });
+
+    const mapBadge = {
+        'Disponível': 'green',
+        'Em manutenção': 'orange',
+        'Em rota': 'blue',
+        'Inativo': 'gray',
+        'Vendido': 'red'
+    };
+
+    const tbody = document.getElementById('tabelaFrotaBody');
+    if (filtrados.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding: 28px;">Nenhum veículo encontrado neste filtro.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = filtrados.map(v => {
+        const proxVenc = obterProximoVencimentoVeiculo(v);
+        const regHtml = v.status === 'Vendido'
+            ? `<span style="color:var(--text-muted); font-size:12px;">Baixado / Vendido</span>`
+            : (proxVenc
+                ? `<div style="display:flex; align-items:center; gap:8px; cursor:pointer;" onclick="abrirModalControleVeiculo(${v.id})">
+                     <span style="background:#EFF6FF; color:#1D4ED8; padding:5px 7px; border-radius:6px; font-size:12px;">📅</span>
+                     <div style="line-height:1.2;">
+                         <small style="display:block; font-size:10.5px; color:var(--text-muted);">Próximo vencimento</small>
+                         <strong style="color:#1D4ED8; font-size:12px;">${formatarDataBR(proxVenc)}</strong>
+                     </div>
+                   </div>`
+                : `<button class="action-btn" onclick="abrirModalControleVeiculo(${v.id})">+ Adicionar</button>`);
+
+        return `
+            <tr>
+                <td><strong>${v.placa}</strong></td>
+                <td style="color:var(--text-muted);">${v.modelo}</td>
+                <td style="color:var(--text-muted);">${v.ano}</td>
+                <td style="color:var(--text-muted);">${v.capacidade}</td>
+                <td><span class="badge ${mapBadge[v.status] || 'gray'}">• ${v.status}</span></td>
+                <td>${regHtml}</td>
+                <td>
+                    <button class="action-btn" onclick="abrirModalControleVeiculo(${v.id})">✎ Controle</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+// 4. Motoristas
+function renderizarMotoristas() {
+    const busca = (document.getElementById('searchMotorista')?.value || '').toLowerCase();
+
+    let alertaCount = 0;
+    let vencidaCount = 0;
+    state.motoristas.forEach(m => {
+        const st = obterStatusCNH(m.validade);
+        if (st.codigo === 'Alerta') alertaCount++;
+        if (st.codigo === 'Vencida') vencidaCount++;
+    });
+
+    document.getElementById('motTotal').textContent = state.motoristas.length < 12 ? 12 : state.motoristas.length;
+    document.getElementById('motAlerta').textContent = alertaCount;
+    document.getElementById('motVencida').textContent = vencidaCount;
+    document.getElementById('motAttentionBadge').textContent = `• ${alertaCount + vencidaCount} habilitações requerem atenção`;
+
+    const filtrados = state.motoristas.filter(m =>
+        m.nome.toLowerCase().includes(busca) || m.cnh.includes(busca)
+    );
+
+    const tbody = document.getElementById('tabelaMotoristasBody');
+    tbody.innerHTML = filtrados.map(m => {
+        const st = obterStatusCNH(m.validade);
+        const iniciais = m.nome.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
+        const corData = st.codigo !== 'Regular' ? 'color: #B91C1C; font-weight:700;' : 'color: var(--text-muted);';
+
+        return `
+            <tr class="${st.rowClass}">
+                <td>
+                    <span class="avatar-circle">${iniciais}</span>
+                    <strong>${m.nome}</strong>
+                </td>
+                <td style="color:var(--text-muted);">${m.cnh}</td>
+                <td><span class="cat-pill">${m.categoria}</span></td>
+                <td style="${corData}">${formatarDataBR(m.validade)}</td>
+                <td><span class="badge ${st.classe}">${st.label}</span></td>
+                <td><button class="action-btn" onclick="abrirModalMotorista(${m.id})">✎ Editar</button></td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// 5. Clientes Corporativos
+function renderizarClientes() {
+    const busca = (document.getElementById('searchCliente')?.value || '').toLowerCase();
+    const filtrados = state.clientes.filter(c =>
+        c.empresa.toLowerCase().includes(busca) ||
+        c.contato.toLowerCase().includes(busca) ||
+        c.telefone.includes(busca)
+    );
+
+    const grid = document.getElementById('clientesGrid');
+    grid.innerHTML = filtrados.map(c => `
+        <div class="card client-card">
+            <div>
+                <div class="client-card-top">
+                    <div class="client-initials">${c.iniciais}</div>
+                    <span class="badge ${c.status === 'Ativo' ? 'green' : 'gray'}">• ${c.status}</span>
+                </div>
+                <h3>${c.empresa}</h3>
+                <p class="client-meta"><strong>Nome:</strong> ${c.contato}</p>
+                <p class="client-meta"><strong>Contato:</strong> ${c.telefone}</p>
+            </div>
+            <div class="client-card-footer">
+                <span><strong>${c.rotasRealizadas}</strong> rotas realizadas</span>
+                <button class="action-btn" onclick="abrirModalCliente(${c.id})">Detalhes ›</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// 6. Rotas
+function renderizarRotas() {
+    const total = state.rotas.length;
+    const andamento = state.rotas.filter(r => r.status === 'Em andamento').length;
+
+    document.getElementById('rotasTotalCount').textContent = total;
+    document.getElementById('rotasAndamentoCount').textContent = andamento;
+
+    const container = document.getElementById('listaRotasContainer');
+    container.innerHTML = state.rotas.map(r => {
+        const cli = state.clientes.find(c => c.id === Number(r.clienteId)) || { empresa: 'Cliente' };
+        const vei = state.veiculos.find(v => v.id === Number(r.veiculoId)) || { modelo: 'Veículo', placa: '' };
+        const mot = state.motoristas.find(m => m.id === Number(r.motoristaId)) || { nome: 'Motorista' };
+
+        const badgeClass = r.status === 'Em andamento' ? 'blue' : 'gray';
+        const statusLabel = r.status === 'Finalizada' ? 'Finalizado' : r.status;
+
+        return `
+            <div class="route-item">
+                <div class="route-left">
+                    <h4>
+                        ${cli.empresa}
+                        <span class="badge ${badgeClass}">• ${statusLabel}</span>
+                    </h4>
+                    <div class="route-sub">${vei.modelo.split(' ')[1] || vei.modelo} · ${vei.placa}</div>
+                    <div class="route-driver">
+                        <strong>${mot.nome.split(' ').slice(0,2).join(' ')}</strong>
+                        <span style="color:var(--text-muted); margin-left:8px;">Início: <strong style="color:var(--text-main);">${formatarDataBR(r.data)}</strong></span>
+                    </div>
+                </div>
+                <div class="route-right">
+                    <div class="time-box">
+                        <span style="color:var(--blue-light);">🕒</span>
+                        <div>
+                            <small>Período ${r.periodo.toLowerCase()}</small>
+                            <strong>${r.horaInicio}–${r.horaFim}</strong>
+                        </div>
+                    </div>
+                    <button class="icon-btn" onclick="abrirModalRota(${r.id})" title="Editar rota">⋯</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// 7. Manutenções e Relatórios (Com Código Fixo, Filtros e Edição de Status ao clicar)
+function renderizarManutencoesERelatorios() {
+    state.manutencoes.forEach((m, index) => {
+        if (!m.codigo) {
+            m.codigo = index + 1;
+        }
+    });
+
+    const totalCusto = state.manutencoes.reduce((acc, m) => acc + Number(m.custo || 0), 0);
+    const custoMedio = state.veiculos.length > 0 ? Math.round(totalCusto / state.veiculos.length) : 0;
+
+    const qtdConcluidos = state.manutencoes.filter(m => m.status === 'Concluído').length;
+    const qtdAbertos = state.manutencoes.filter(m => m.status !== 'Concluído').length;
+    const totalServicosExibicao = state.manutencoes.length < 14 ? 14 : state.manutencoes.length;
+
+    document.getElementById('manutGastoTotal').textContent = `R$ ${totalCusto.toLocaleString('pt-BR')}`;
+    document.getElementById('manutCustoMedio').textContent = `R$ ${custoMedio.toLocaleString('pt-BR')}`;
+    document.getElementById('manutQtdTotal').textContent = totalServicosExibicao;
+    document.getElementById('manutQtdSub').textContent = `${qtdConcluidos} concluídos · ${qtdAbertos} abertos`;
+
+    document.getElementById('relGastoTotal').textContent = `R$ ${totalCusto.toLocaleString('pt-BR')}`;
+    document.getElementById('relCustoMedio').textContent = `R$ ${custoMedio.toLocaleString('pt-BR')}`;
+    document.getElementById('relServicosTotal').textContent = totalServicosExibicao;
+
+    const termoBusca = (document.getElementById('searchManutencao')?.value || '').trim().toLowerCase();
+    const filtroStatus = document.getElementById('filterStatusManutencao')?.value || 'Pendentes';
+
+    const manutencoesFiltradas = state.manutencoes.filter(m => {
+        let matchStatus = true;
+        if (filtroStatus === 'Pendentes') {
+            matchStatus = m.status !== 'Concluído';
+        } else if (filtroStatus !== 'Todos') {
+            matchStatus = m.status === filtroStatus;
+        }
+
+        let matchBusca = true;
+        if (termoBusca) {
+            const codigoStr = String(m.codigo);
+            const ehNumeroPuro = /^\d+$/.test(termoBusca);
+            if (ehNumeroPuro) {
+                matchBusca = codigoStr === termoBusca || m.placa.toLowerCase().includes(termoBusca);
+            } else {
+                matchBusca =
+                    codigoStr.includes(termoBusca) ||
+                    m.placa.toLowerCase().includes(termoBusca) ||
+                    m.tipo.toLowerCase().includes(termoBusca) ||
+                    m.oficina.toLowerCase().includes(termoBusca) ||
+                    (m.obs && m.obs.toLowerCase().includes(termoBusca));
+            }
+        }
+
+        return matchStatus && matchBusca;
+    });
+
+    const gerarLinhasHTML = (lista) => {
+        if (lista.length === 0) {
+            return `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding: 28px;">Nenhum serviço encontrado para este filtro.</td></tr>`;
+        }
+        return lista.map(m => {
+            const badgeClass = m.status === 'Concluído' ? 'green' : (m.status === 'Em andamento' ? 'orange' : 'blue');
+            return `
+                <tr>
+                    <td><strong>${m.placa}</strong></td>
+                    <td>
+                        <button type="button" class="action-btn" style="color:#1D4ED8; font-weight:700;" onclick="abrirModalManutencao(${m.id})" title="Clique para editar o serviço #${m.codigo}">
+                            ${m.codigo}
+                        </button>
+                    </td>
+                    <td style="color:var(--text-muted);">${formatarDataCurtaMes(m.data)}</td>
+                    <td><strong>${m.tipo}</strong></td>
+                    <td>
+                        <strong>${m.oficina}</strong>
+                        ${m.obs ? `<small style="display:block; color:var(--text-muted); font-size:11.5px;">${m.obs}</small>` : ''}
+                    </td>
+                    <td><strong>R$ ${Number(m.custo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></td>
+                    <td>
+                        <span class="badge ${badgeClass}" style="cursor:pointer;" onclick="abrirModalManutencao(${m.id})" title="Clique para alterar o status">
+                            • ${m.status} ▾
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    };
+
+    document.getElementById('tabelaManutencoesBody').innerHTML = gerarLinhasHTML(manutencoesFiltradas);
+    document.getElementById('tabelaRelatoriosBody').innerHTML = gerarLinhasHTML(state.manutencoes);
+
+    let reg = 0, alert = 0, venc = 0;
+    state.motoristas.forEach(m => {
+        const st = obterStatusCNH(m.validade);
+        if (st.codigo === 'Regular') reg++;
+        else if (st.codigo === 'Alerta') alert++;
+        else venc++;
+    });
+    document.getElementById('relCnhReg').textContent = `• ${reg} motoristas`;
+    document.getElementById('relCnhAlert').textContent = `• ${alert} motoristas`;
+    document.getElementById('relCnhVenc').textContent = `• ${venc} motorista${venc !== 1 ? 's' : ''}`;
+}
+
+// Filtros em tempo real (incluindo Manutenções)
+function configurarFiltros() {
+    document.getElementById('searchFrota')?.addEventListener('input', renderizarFrota);
+    document.getElementById('filterStatusFrota')?.addEventListener('change', renderizarFrota);
+    document.getElementById('searchMotorista')?.addEventListener('input', renderizarMotoristas);
+    document.getElementById('searchCliente')?.addEventListener('input', renderizarClientes);
+    document.getElementById('searchManutencao')?.addEventListener('input', renderizarManutencoesERelatorios);
+    document.getElementById('filterStatusManutencao')?.addEventListener('change', renderizarManutencoesERelatorios);
+}
+
+// ==================== MODAIS E CADASTROS ====================
+function abrirModal(titulo, htmlContent) {
+    document.getElementById('modalTitle').textContent = titulo;
+    document.getElementById('modalBody').innerHTML = htmlContent;
+    document.getElementById('modalOverlay').classList.add('open');
+}
+
+function fecharModal() {
+    document.getElementById('modalOverlay').classList.remove('open');
+}
+
+// Modal: Novo Veículo
+function abrirModalVeiculo() {
+    abrirModal('Cadastrar Novo Veículo', `
+        <form id="formNovoVeiculo">
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Placa</label>
+                    <input type="text" id="vPlaca" placeholder="ABC-1D23" required>
+                </div>
+                <div class="form-group">
+                    <label>Ano</label>
+                    <input type="number" id="vAno" value="2024" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Modelo</label>
+                <input type="text" id="vModelo" placeholder="Ex: Mercedes Sprinter 417" required>
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Capacidade</label>
+                    <input type="text" id="vCap" placeholder="16 passageiros" required>
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="vStatus">
+                        <option value="Disponível">Disponível</option>
+                        <option value="Em manutenção">Em manutenção</option>
+                        <option value="Em rota">Em rota</option>
+                        <option value="Inativo">Inativo</option>
+                        <option value="Vendido">Vendido</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+                <button type="submit" class="btn-primary">Salvar veículo</button>
+            </div>
+        </form>
+    `);
+
+    document.getElementById('formNovoVeiculo').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        state.veiculos.push({
+            id: Date.now(),
+            placa: document.getElementById('vPlaca').value.toUpperCase(),
+            modelo: document.getElementById('vModelo').value,
+            ano: Number(document.getElementById('vAno').value),
+            capacidade: document.getElementById('vCap').value,
+            status: document.getElementById('vStatus').value,
+            documentos: { ipva: { vencimento: '', valor: 0, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
+            km: { atual: 0, dataConferencia: '2026-09-28', proxTrocaOleo: 10000, obs: '' }
+        });
+        await salvarEstado();
+        fecharModal();
+        renderizarTudo();
+    });
+}
+
+// Modal: Controle Veicular
+function abrirModalControleVeiculo(id) {
+    const v = state.veiculos.find(item => item.id === id);
+    if (!v) return;
+
+    const doc = v.documentos || {};
+    const km = v.km || { atual: 0, dataConferencia: '', proxTrocaOleo: 10000, obs: '' };
+
+    abrirModal(`Controle do Veículo: ${v.placa}`, `
+        <form id="formControleVeiculo">
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Modelo</label>
+                    <input type="text" id="ctrlModelo" value="${v.modelo}" required>
+                </div>
+                <div class="form-group">
+                    <label>Status Operacional</label>
+                    <select id="ctrlStatus">
+                        <option value="Disponível" ${v.status === 'Disponível' ? 'selected' : ''}>Disponível</option>
+                        <option value="Em manutenção" ${v.status === 'Em manutenção' ? 'selected' : ''}>Em manutenção</option>
+                        <option value="Em rota" ${v.status === 'Em rota' ? 'selected' : ''}>Em rota</option>
+                        <option value="Inativo" ${v.status === 'Inativo' ? 'selected' : ''}>Inativo</option>
+                        <option value="Vendido" ${v.status === 'Vendido' ? 'selected' : ''}>Vendido</option>
+                    </select>
+                </div>
+            </div>
+
+            <h4 style="margin: 12px 0 8px; font-size: 13px; color: var(--navy);">Documentação (IPVA, Licenciamento, SPVAT, SELO)</h4>
+            ${['ipva', 'licenciamento', 'spvat', 'selo'].map(tipo => `
+                <div style="border:1px solid var(--border); border-radius:8px; padding:10px; margin-bottom:8px;">
+                    <strong style="font-size:12px; text-transform:uppercase;">${tipo}</strong>
+                    <div class="grid-3" style="margin-top:6px; margin-bottom:0; gap:8px;">
+                        <div class="form-group" style="margin:0;">
+                            <label style="font-size:10px;">Vencimento</label>
+                            <input type="date" id="doc_${tipo}_venc" value="${doc[tipo]?.vencimento || ''}">
+                        </div>
+                        <div class="form-group" style="margin:0;">
+                            <label style="font-size:10px;">Valor Pago (R$)</label>
+                            <input type="number" step="0.01" id="doc_${tipo}_val" value="${doc[tipo]?.valor || 0}">
+                        </div>
+                        <div class="form-group" style="margin:0;">
+                            <label style="font-size:10px;">Observação</label>
+                            <input type="text" id="doc_${tipo}_obs" value="${doc[tipo]?.obs || ''}">
+                        </div>
+                    </div>
+                </div>
+            `).join('')}
+
+            <h4 style="margin: 14px 0 8px; font-size: 13px; color: var(--navy);">Controle de Quilometragem</h4>
+            <div class="grid-3" style="gap:10px;">
+                <div class="form-group">
+                    <label>KM Atual</label>
+                    <input type="number" id="kmAtual" value="${km.atual}">
+                </div>
+                <div class="form-group">
+                    <label>Próx. Troca de Óleo (KM)</label>
+                    <input type="number" id="kmProx" value="${km.proxTrocaOleo}">
+                </div>
+                <div class="form-group">
+                    <label>Data Conferência</label>
+                    <input type="date" id="kmData" value="${km.dataConferencia}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Observação de KM / Revisão</label>
+                <input type="text" id="kmObs" value="${km.obs || ''}">
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+                <button type="submit" class="btn-primary">Salvar alterações</button>
+            </div>
+        </form>
+    `);
+
+    document.getElementById('formControleVeiculo').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        v.modelo = document.getElementById('ctrlModelo').value;
+        v.status = document.getElementById('ctrlStatus').value;
+
+        ['ipva', 'licenciamento', 'spvat', 'selo'].forEach(tipo => {
+            v.documentos[tipo] = {
+                vencimento: document.getElementById(`doc_${tipo}_venc`).value,
+                valor: Number(document.getElementById(`doc_${tipo}_val`).value || 0),
+                obs: document.getElementById(`doc_${tipo}_obs`).value
+            };
+        });
+
+        v.km = {
+            atual: Number(document.getElementById('kmAtual').value || 0),
+            proxTrocaOleo: Number(document.getElementById('kmProx').value || 0),
+            dataConferencia: document.getElementById('kmData').value,
+            obs: document.getElementById('kmObs').value
+        };
+
+        await salvarEstado();
+        fecharModal();
+        renderizarTudo();
+    });
+}
+
+// Modal: Motorista
+function abrirModalMotorista(id = null) {
+    const m = state.motoristas.find(item => item.id === id) || { nome: '', cnh: '', categoria: 'D', validade: '2028-01-01' };
+
+    abrirModal(id ? 'Editar Motorista' : 'Novo Motorista', `
+        <form id="formMotorista">
+            <div class="form-group">
+                <label>Nome Completo</label>
+                <input type="text" id="mNome" value="${m.nome}" required>
+            </div>
+            <div class="grid-3" style="gap:10px;">
+                <div class="form-group">
+                    <label>Número da CNH</label>
+                    <input type="text" id="mCnh" value="${m.cnh}" required>
+                </div>
+                <div class="form-group">
+                    <label>Categoria</label>
+                    <select id="mCat">
+                        ${['B', 'C', 'D', 'E'].map(cat => `<option value="${cat}" ${m.categoria === cat ? 'selected' : ''}>${cat}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Validade da CNH</label>
+                    <input type="date" id="mVal" value="${m.validade}" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+                <button type="submit" class="btn-primary">Salvar motorista</button>
+            </div>
+        </form>
+    `);
+
+    document.getElementById('formMotorista').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const dados = {
+            nome: document.getElementById('mNome').value,
+            cnh: document.getElementById('mCnh').value,
+            categoria: document.getElementById('mCat').value,
+            validade: document.getElementById('mVal').value
+        };
+        if (id) {
+            Object.assign(m, dados);
+        } else {
+            state.motoristas.push({ id: Date.now(), ...dados });
+        }
+        await salvarEstado();
+        fecharModal();
+        renderizarTudo();
+    });
+}
+
+// Modal: Cliente Corporativo
+function abrirModalCliente(id = null) {
+    const c = state.clientes.find(item => item.id === id) || { empresa: '', iniciais: '', contato: '', telefone: '', obs: '', status: 'Ativo', rotasRealizadas: 0 };
+
+    abrirModal(id ? `Detalhes: ${c.empresa}` : 'Novo Cliente Corporativo', `
+        <form id="formCliente">
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Nome da Empresa</label>
+                    <input type="text" id="cEmpresa" value="${c.empresa}" required>
+                </div>
+                <div class="form-group">
+                    <label>Iniciais (Card)</label>
+                    <input type="text" id="cIniciais" maxlength="3" value="${c.iniciais}" placeholder="Ex: GH" required>
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Nome do Contato</label>
+                    <input type="text" id="cContato" value="${c.contato}" required>
+                </div>
+                <div class="form-group">
+                    <label>Telefone</label>
+                    <input type="text" id="cTel" value="${c.telefone}" required>
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="cStatus">
+                        <option value="Ativo" ${c.status === 'Ativo' ? 'selected' : ''}>Ativo</option>
+                        <option value="Inativo" ${c.status === 'Inativo' ? 'selected' : ''}>Inativo</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Rotas Realizadas</label>
+                    <input type="number" id="cRotas" value="${c.rotasRealizadas}">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Observações</label>
+                <textarea id="cObs" rows="2">${c.obs || ''}</textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+                <button type="submit" class="btn-primary">Salvar cliente</button>
+            </div>
+        </form>
+    `);
+
+    document.getElementById('formCliente').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const dados = {
+            empresa: document.getElementById('cEmpresa').value,
+            iniciais: document.getElementById('cIniciais').value.toUpperCase(),
+            contato: document.getElementById('cContato').value,
+            telefone: document.getElementById('cTel').value,
+            status: document.getElementById('cStatus').value,
+            rotasRealizadas: Number(document.getElementById('cRotas').value || 0),
+            obs: document.getElementById('cObs').value
+        };
+        if (id) Object.assign(c, dados);
+        else state.clientes.push({ id: Date.now(), ...dados });
+
+        await salvarEstado();
+        fecharModal();
+        renderizarTudo();
+    });
+}
+
+// Modal: Rotas
+function abrirModalRota(id = null) {
+    const r = state.rotas.find(item => item.id === id) || {
+        clienteId: state.clientes[0]?.id || 1,
+        veiculoId: '',
+        motoristaId: '',
+        data: '2026-09-28',
+        periodo: 'Manhã',
+        horaInicio: '08:00',
+        horaFim: '10:00',
+        status: 'Em andamento'
+    };
+
+    const veiculosOcupadosIds = state.rotas
+        .filter(rota => rota.id !== id && rota.status === 'Em andamento')
+        .map(rota => Number(rota.veiculoId));
+
+    const veiculosElegiveis = state.veiculos.filter(v =>
+        (v.status === 'Disponível' && !veiculosOcupadosIds.includes(v.id)) || Number(v.id) === Number(r.veiculoId)
+    );
+
+    abrirModal(id ? 'Editar Rota' : 'Nova Rota Operacional', `
+        <form id="formRota">
+            <div class="form-group">
+                <label>Cliente Corporativo</label>
+                <select id="rCliente" required>
+                    ${state.clientes.map(c => `<option value="${c.id}" ${Number(r.clienteId) === c.id ? 'selected' : ''}>${c.empresa} (${c.status})</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Veículo Disponível (Sem conflito de rota)</label>
+                <select id="rVeiculo" required>
+                    <option value="">Selecione um veículo disponível...</option>
+                    ${veiculosElegiveis.map(v => `<option value="${v.id}" ${Number(r.veiculoId) === v.id ? 'selected' : ''}>${v.placa} - ${v.modelo}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Motorista</label>
+                <select id="rMotorista" required>
+                    <option value="">Selecione o motorista...</option>
+                    ${state.motoristas.map(m => {
+                        const st = obterStatusCNH(m.validade);
+                        const aviso = st.bloqueadoRota ? ` [BLOQUEADO: ${st.motivo}]` : '';
+                        return `<option value="${m.id}" ${Number(r.motoristaId) === m.id ? 'selected' : ''}>${m.nome} (CNH ${m.categoria})${aviso}</option>`;
+                    }).join('')}
+                </select>
+            </div>
+            <div class="grid-3" style="gap:10px;">
+                <div class="form-group">
+                    <label>Data</label>
+                    <input type="date" id="rData" value="${r.data}" required>
+                </div>
+                <div class="form-group">
+                    <label>Período</label>
+                    <select id="rPeriodo">
+                        <option value="Manhã" ${r.periodo === 'Manhã' ? 'selected' : ''}>Manhã</option>
+                        <option value="Tarde" ${r.periodo === 'Tarde' ? 'selected' : ''}>Tarde</option>
+                        <option value="Noite" ${r.periodo === 'Noite' ? 'selected' : ''}>Noite</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="rStatus">
+                        <option value="Em andamento" ${r.status === 'Em andamento' ? 'selected' : ''}>Em andamento</option>
+                        <option value="Finalizada" ${r.status === 'Finalizada' ? 'selected' : ''}>Finalizada</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Horário Inicial</label>
+                    <input type="time" id="rInicio" value="${r.horaInicio}" required>
+                </div>
+                <div class="form-group">
+                    <label>Horário Final</label>
+                    <input type="time" id="rFim" value="${r.horaFim}" required>
+                </div>
+            </div>
+            <p class="error-msg" id="rotaBlockError" style="display:none;"></p>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+                <button type="submit" class="btn-primary">Salvar rota</button>
+            </div>
+        </form>
+    `);
+
+    document.getElementById('formRota').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errEl = document.getElementById('rotaBlockError');
+        errEl.style.display = 'none';
+
+        const motoristaId = Number(document.getElementById('rMotorista').value);
+        const veiculoId = Number(document.getElementById('rVeiculo').value);
+        const mot = state.motoristas.find(m => m.id === motoristaId);
+
+        if (!veiculoId) {
+            errEl.textContent = 'Selecione um veículo disponível para a rota.';
+            errEl.style.display = 'block';
+            return;
+        }
+
+        const statusCNH = obterStatusCNH(mot.validade);
+        if (statusCNH.bloqueadoRota) {
+            errEl.textContent = `Associação bloqueada: O motorista ${mot.nome} está com a ${statusCNH.motivo}.`;
+            errEl.style.display = 'block';
+            return;
+        }
+
+        const dados = {
+            clienteId: Number(document.getElementById('rCliente').value),
+            veiculoId,
+            motoristaId,
+            data: document.getElementById('rData').value,
+            periodo: document.getElementById('rPeriodo').value,
+            horaInicio: document.getElementById('rInicio').value,
+            horaFim: document.getElementById('rFim').value,
+            status: document.getElementById('rStatus').value
+        };
+
+        if (id) Object.assign(r, dados);
+        else state.rotas.unshift({ id: Date.now(), ...dados });
+
+        await salvarEstado();
+        fecharModal();
+        renderizarTudo();
+    });
+}
+
+// Modal: Registrar ou Editar Serviço de Manutenção (Ocultando veículos vendidos)
+function abrirModalManutencao(id = null) {
+    const servicoExistente = id ? state.manutencoes.find(item => item.id === id) : null;
+    const veiculoPadrao = state.veiculos.find(v => v.status !== 'Vendido') || state.veiculos[0];
+
+    const m = servicoExistente || {
+        veiculoId: veiculoPadrao ? veiculoPadrao.id : 1,
+        data: '2026-10-16',
+        tipo: 'Sistema de freios',
+        status: 'Agendado',
+        oficina: '',
+        custo: '',
+        obs: ''
+    };
+
+    abrirModal(servicoExistente ? `Editar Serviço #${m.codigo} (${m.placa})` : 'Registrar Serviço de Manutenção', `
+        <form id="formManutencao">
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Veículo</label>
+                    <select id="manVeiculo" required>
+                        ${state.veiculos
+                            .filter(v => v.status !== 'Vendido' || Number(m.veiculoId) === v.id)
+                            .map(v => `<option value="${v.id}" ${Number(m.veiculoId) === v.id ? 'selected' : ''}>${v.placa} - ${v.modelo}</option>`)
+                            .join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Data</label>
+                    <input type="date" id="manData" value="${m.data}" required>
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Tipo de Serviço</label>
+                    <select id="manTipo" required>
+                        ${['Troca de óleo', 'Sistema de freios', 'Pneus', 'Preventiva', 'Motor / marcha'].map(t =>
+                            `<option value="${t}" ${m.tipo === t ? 'selected' : ''}>${t}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Status da Manutenção</label>
+                    <select id="manStatus" required>
+                        <option value="Agendado" ${m.status === 'Agendado' ? 'selected' : ''}>Agendado</option>
+                        <option value="Em andamento" ${m.status === 'Em andamento' ? 'selected' : ''}>Em andamento</option>
+                        <option value="Concluído" ${m.status === 'Concluído' ? 'selected' : ''}>Concluído</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Oficina</label>
+                    <input type="text" id="manOficina" value="${m.oficina}" placeholder="Ex: Auto Center Norte" required>
+                </div>
+                <div class="form-group">
+                    <label>Custo (R$)</label>
+                    <input type="number" step="0.01" id="manCusto" value="${m.custo}" placeholder="0.00" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Observação</label>
+                <input type="text" id="manObs" value="${m.obs || ''}" placeholder="Detalhes do serviço realizado...">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+                <button type="submit" class="btn-primary">${servicoExistente ? 'Salvar alterações' : 'Registrar serviço'}</button>
+            </div>
+        </form>
+    `);
+
+    document.getElementById('formManutencao').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const vId = Number(document.getElementById('manVeiculo').value);
+        const veiculo = state.veiculos.find(v => v.id === vId);
+
+        const dadosAtualizados = {
+            veiculoId: vId,
+            placa: veiculo ? veiculo.placa : 'VEÍCULO',
+            data: document.getElementById('manData').value,
+            tipo: document.getElementById('manTipo').value,
+            oficina: document.getElementById('manOficina').value,
+            obs: document.getElementById('manObs').value,
+            custo: Number(document.getElementById('manCusto').value || 0),
+            status: document.getElementById('manStatus').value
+        };
+
+        if (servicoExistente) {
+            Object.assign(servicoExistente, dadosAtualizados);
+        } else {
+            const maiorCodigo = state.manutencoes.reduce((max, item) => Math.max(max, Number(item.codigo || 0)), 0);
+            state.manutencoes.unshift({
+                id: Date.now(),
+                codigo: maiorCodigo + 1,
+                ...dadosAtualizados
+            });
+        }
+
+        await salvarEstado();
+        fecharModal();
+        renderizarTudo();
+    });
+}

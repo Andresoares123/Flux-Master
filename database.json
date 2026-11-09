@@ -1,0 +1,571 @@
+{
+  "usuarios": [
+    {
+      "id": 1,
+      "nome": "Lucas Mendes",
+      "usuario": "LUCAS MENDES",
+      "cargo": "Proprietário",
+      "senha": "123"
+    }
+  ],
+  "veiculos": [
+    {
+      "id": 1,
+      "placa": "QWE-4D21",
+      "modelo": "Mercedes Sprinter 417",
+      "ano": 2023,
+      "capacidade": "15 passageiros",
+      "status": "Inativo",
+      "documentos": {
+        "ipva": {
+          "vencimento": "2026-11-18",
+          "valor": 3200,
+          "obs": "Cota única"
+        },
+        "licenciamento": {
+          "vencimento": "2026-11-30",
+          "valor": 160,
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "2026-10-30",
+          "valor": 120,
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "2026-12-10",
+          "valor": 250,
+          "obs": ""
+        }
+      },
+      "km": {
+        "atual": 45200,
+        "proxTrocaOleo": 50000,
+        "dataConferencia": "2026-09-25",
+        "obs": "Regular"
+      }
+    },
+    {
+      "id": 2,
+      "placa": "RTA-8F02",
+      "modelo": "Renault Master L3H2",
+      "ano": 2022,
+      "capacidade": "16 passageiros",
+      "status": "Inativo",
+      "documentos": {
+        "ipva": {
+          "vencimento": "2026-11-03",
+          "valor": 2900,
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        }
+      },
+      "km": {
+        "atual": 68900,
+        "proxTrocaOleo": 70000,
+        "dataConferencia": "2026-09-20",
+        "obs": "Revisão pendente"
+      }
+    },
+    {
+      "id": 3,
+      "placa": "LMN-2G89",
+      "modelo": "Fiat Ducato Minibus",
+      "ano": 2024,
+      "capacidade": "17 passageiros",
+      "status": "Vendido",
+      "documentos": {
+        "ipva": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        }
+      },
+      "km": {
+        "atual": 18400,
+        "proxTrocaOleo": 25000,
+        "dataConferencia": "2026-09-22",
+        "obs": ""
+      }
+    },
+    {
+      "id": 4,
+      "placa": "BXD-7A14",
+      "modelo": "Ford Transit 410",
+      "ano": 2021,
+      "capacidade": "14 passageiros",
+      "status": "Em rota",
+      "documentos": {
+        "ipva": {
+          "vencimento": "2026-12-28",
+          "valor": 2650,
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "2026-12-20",
+          "valor": 5,
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        }
+      },
+      "km": {
+        "atual": 82100,
+        "proxTrocaOleo": 90000,
+        "dataConferencia": "2026-09-28",
+        "obs": ""
+      }
+    },
+    {
+      "id": 5,
+      "placa": "HJK-9C33",
+      "modelo": "Volkswagen Crafter",
+      "ano": 2020,
+      "capacidade": "16 passageiros",
+      "status": "Inativo",
+      "documentos": {
+        "ipva": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        }
+      },
+      "km": {
+        "atual": 112000,
+        "dataConferencia": "2026-08-15",
+        "proxTrocaOleo": 120000,
+        "obs": ""
+      }
+    },
+    {
+      "id": 6,
+      "placa": "KLP-3B72",
+      "modelo": "Iveco Daily Minibus",
+      "ano": 2023,
+      "capacidade": "16 passageiros",
+      "status": "Disponível",
+      "documentos": {
+        "ipva": {
+          "vencimento": "2027-01-18",
+          "valor": 3100,
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        }
+      },
+      "km": {
+        "atual": 34000,
+        "dataConferencia": "2026-09-18",
+        "proxTrocaOleo": 40000,
+        "obs": ""
+      }
+    },
+    {
+      "id": 7,
+      "placa": "MNO-6E41",
+      "modelo": "Mercedes Sprinter 416",
+      "ano": 2024,
+      "capacidade": "15 passageiros",
+      "status": "Disponível",
+      "documentos": {
+        "ipva": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        }
+      },
+      "km": {
+        "atual": 12300,
+        "dataConferencia": "2026-09-25",
+        "proxTrocaOleo": 20000,
+        "obs": ""
+      }
+    },
+    {
+      "id": 8,
+      "placa": "PQR-1A99",
+      "modelo": "Mercedes Sprinter 517",
+      "ano": 2024,
+      "capacidade": "18 passageiros",
+      "status": "Disponível",
+      "documentos": {
+        "ipva": {
+          "vencimento": "2027-02-10",
+          "valor": 3500,
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        }
+      },
+      "km": {
+        "atual": 9500,
+        "dataConferencia": "2026-09-27",
+        "proxTrocaOleo": 15000,
+        "obs": ""
+      }
+    },
+    {
+      "id": 9,
+      "placa": "STU-4B22",
+      "modelo": "Renault Master Minibus",
+      "ano": 2023,
+      "capacidade": "16 passageiros",
+      "status": "Disponível",
+      "documentos": {
+        "ipva": {
+          "vencimento": "2027-03-05",
+          "valor": 2950,
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        }
+      },
+      "km": {
+        "atual": 27400,
+        "proxTrocaOleo": 35000,
+        "dataConferencia": "2026-09-20",
+        "obs": ""
+      }
+    },
+    {
+      "id": 10,
+      "placa": "VWX-8C55",
+      "modelo": "Fiat Ducato Executiva",
+      "ano": 2022,
+      "capacidade": "15 passageiros",
+      "status": "Disponível",
+      "documentos": {
+        "ipva": {
+          "vencimento": "2026-12-12",
+          "valor": 2800,
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": 0,
+          "obs": ""
+        }
+      },
+      "km": {
+        "atual": 54000,
+        "proxTrocaOleo": 60000,
+        "dataConferencia": "2026-09-15",
+        "obs": ""
+      }
+    }
+  ],
+  "motoristas": [
+    {
+      "id": 1,
+      "nome": "Carlos Eduardo Lima",
+      "cnh": "08945123760",
+      "categoria": "D",
+      "validade": "2028-08-18"
+    },
+    {
+      "id": 2,
+      "nome": "Márcia Vieira Souza",
+      "cnh": "05478321908",
+      "categoria": "D",
+      "validade": "2026-11-14"
+    },
+    {
+      "id": 3,
+      "nome": "João Marcos Reis",
+      "cnh": "07321654892",
+      "categoria": "E",
+      "validade": "2026-10-01"
+    },
+    {
+      "id": 4,
+      "nome": "Paulo Henrique Alves",
+      "cnh": "09123654788",
+      "categoria": "C",
+      "validade": "2029-05-24"
+    },
+    {
+      "id": 5,
+      "nome": "André Luiz Costa",
+      "cnh": "04652139877",
+      "categoria": "D",
+      "validade": "2027-11-05"
+    }
+  ],
+  "clientes": [
+    {
+      "id": 1,
+      "empresa": "Grupo Horizonte",
+      "iniciais": "GH",
+      "contato": "Ana Martins",
+      "telefone": "(11) 98765-4321",
+      "obs": "Contrato corporativo padrão",
+      "status": "Inativo",
+      "rotasRealizadas": 34
+    },
+    {
+      "id": 2,
+      "empresa": "Instituto Ideal",
+      "iniciais": "II",
+      "contato": "Ricardo Sales",
+      "telefone": "(11) 3456-7890",
+      "obs": "Rotas matutinas e vespertinas",
+      "status": "Ativo",
+      "rotasRealizadas": 18
+    },
+    {
+      "id": 3,
+      "empresa": "Construtora Vértice",
+      "iniciais": "CV",
+      "contato": "Beatriz Rocha",
+      "telefone": "(21) 99876-1204",
+      "obs": "Engenharia e obras",
+      "status": "Ativo",
+      "rotasRealizadas": 27
+    },
+    {
+      "id": 4,
+      "empresa": "BioSaúde",
+      "iniciais": "BS",
+      "contato": "Marcos Nunes",
+      "telefone": "(31) 3344-5566",
+      "obs": "Laboratórios",
+      "status": "Inativo",
+      "rotasRealizadas": 12
+    }
+  ],
+  "rotas": [
+    {
+      "id": 1794104907924,
+      "clienteId": 1,
+      "veiculoId": 7,
+      "motoristaId": 4,
+      "data": "2026-09-27",
+      "periodo": "Manhã",
+      "horaInicio": "08:00",
+      "horaFim": "10:00",
+      "status": "Finalizada"
+    },
+    {
+      "id": 1,
+      "clienteId": 1,
+      "veiculoId": 1,
+      "motoristaId": 1,
+      "data": "2026-09-28",
+      "periodo": "Manhã",
+      "horaInicio": "08:00",
+      "horaFim": "10:00",
+      "status": "Finalizada"
+    },
+    {
+      "id": 2,
+      "clienteId": 2,
+      "veiculoId": 3,
+      "motoristaId": 2,
+      "data": "2026-09-28",
+      "periodo": "Manhã",
+      "horaInicio": "10:30",
+      "horaFim": "12:30",
+      "status": "Em andamento"
+    },
+    {
+      "id": 3,
+      "clienteId": 3,
+      "veiculoId": 4,
+      "motoristaId": 3,
+      "data": "2026-09-28",
+      "periodo": "Tarde",
+      "horaInicio": "13:45",
+      "horaFim": "15:30",
+      "status": "Em andamento"
+    },
+    {
+      "id": 4,
+      "clienteId": 4,
+      "veiculoId": 5,
+      "motoristaId": 4,
+      "data": "2026-09-28",
+      "periodo": "Noite",
+      "horaInicio": "18:00",
+      "horaFim": "20:00",
+      "status": "Finalizada"
+    }
+  ],
+  "manutencoes": [
+    {
+      "id": 1794105059426,
+      "veiculoId": 1,
+      "placa": "QWE-4D21",
+      "data": "2026-10-16",
+      "tipo": "Sistema de freios",
+      "oficina": "PAULINHO CENTER",
+      "obs": "",
+      "custo": 250,
+      "status": "Concluído",
+      "codigo": 1
+    },
+    {
+      "id": 1,
+      "veiculoId": 2,
+      "placa": "RTA-8F02",
+      "data": "2026-09-26",
+      "tipo": "Sistema de freios",
+      "oficina": "Auto Center Norte",
+      "obs": "",
+      "custo": 2480,
+      "status": "Concluído",
+      "codigo": 2
+    },
+    {
+      "id": 2,
+      "veiculoId": 1,
+      "placa": "QWE-4D21",
+      "data": "2026-09-18",
+      "tipo": "Troca de óleo",
+      "oficina": "Oficina Avenida",
+      "obs": "",
+      "custo": 690,
+      "status": "Concluído",
+      "codigo": 3
+    },
+    {
+      "id": 3,
+      "veiculoId": 5,
+      "placa": "HJK-9C33",
+      "data": "2026-09-12",
+      "tipo": "Pneus",
+      "oficina": "Pneus Brasil",
+      "obs": "Substituição dos pneus dianteiros.",
+      "custo": 3220,
+      "status": "Concluído",
+      "codigo": 4
+    },
+    {
+      "id": 4,
+      "veiculoId": 3,
+      "placa": "LMN-2G89",
+      "data": "2026-09-04",
+      "tipo": "Preventiva",
+      "oficina": "Fiat Pro",
+      "obs": "Revisão preventiva completa.",
+      "custo": 1340,
+      "status": "Concluído",
+      "codigo": 5
+    }
+  ]
+}

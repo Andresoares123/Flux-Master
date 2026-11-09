@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LM Transportes & Locações - Login</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="login-body">
+    <div class="card login-box">
+        <img src="logo.png" alt="Logo LM Transportes" class="login-logo">
+        <h2 class="login-title">Acesso ao painel</h2>
+        <p class="login-subtitle">Entre com sua senha para continuar</p>
+        
+        <!-- Formulário de Login -->
+        <form id="loginForm">
+            <div class="form-group">
+                <label>USUÁRIO</label>
+                <input type="text" id="user" value="LUCAS MENDES" required>
+            </div>
+            <div class="form-group">
+                <label>SENHA</label>
+                <input type="password" id="password" placeholder="Digite sua senha" required>
+            </div>
+            <button type="submit" class="btn-primary">Entrar no painel</button>
+            <p class="error-msg" id="errorMsg">Senha incorreta. Tente novamente.</p>
+            <p class="success-msg" id="successMsg"></p>
+        </form>
+
+        <!-- Formulário de Redefinição de Senha -->
+        <form id="resetForm" style="display: none;">
+            <div class="form-group">
+                <label>NOVA SENHA</label>
+                <input type="password" id="newPassword" placeholder="Digite a nova senha" required>
+            </div>
+            <div class="form-group">
+                <label>CONFIRMAR NOVA SENHA</label>
+                <input type="password" id="confirmPassword" placeholder="Confirme a nova senha" required>
+            </div>
+            <button type="submit" class="btn-primary">Salvar nova senha</button>
+            <p class="error-msg" id="resetErrorMsg"></p>
+        </form>
+
+        <button type="button" id="toggleResetBtn" class="link-btn">Redefinir senha</button>
+    </div>
+
+    <script src="js/auth.js"></script>
+</body>
+</html>
