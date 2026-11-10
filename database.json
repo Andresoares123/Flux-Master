@@ -447,6 +447,16 @@
       "obs": "Laboratórios",
       "status": "Inativo",
       "rotasRealizadas": 12
+    },
+    {
+      "id": 1794322978626,
+      "empresa": "asasas",
+      "iniciais": "AS",
+      "contato": "JOAO",
+      "telefone": "38999999",
+      "status": "Inativo",
+      "rotasRealizadas": 0,
+      "obs": ""
     }
   ],
   "rotas": [
@@ -476,12 +486,12 @@
       "id": 2,
       "clienteId": 2,
       "veiculoId": 3,
-      "motoristaId": 2,
+      "motoristaId": 1,
       "data": "2026-09-28",
       "periodo": "Manhã",
       "horaInicio": "10:30",
       "horaFim": "12:30",
-      "status": "Em andamento"
+      "status": "Finalizada"
     },
     {
       "id": 3,
@@ -539,7 +549,7 @@
       "tipo": "Troca de óleo",
       "oficina": "Oficina Avenida",
       "obs": "",
-      "custo": 690,
+      "custo": 500,
       "status": "Concluído",
       "codigo": 3
     },
@@ -551,7 +561,7 @@
       "tipo": "Pneus",
       "oficina": "Pneus Brasil",
       "obs": "Substituição dos pneus dianteiros.",
-      "custo": 3220,
+      "custo": 500,
       "status": "Concluído",
       "codigo": 4
     },

@@ -128,22 +128,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     setInterval(atualizarRelogioCabecalho, 60000); // Atualiza a cada 1 minuto
 
 async function carregarDados() {
+    try {
+        // 1. Prioriza sempre o banco de dados do servidor (database.json)
+        const res = await fetch('/api/dados');
+        const serverData = await res.json();
+        
+        if (serverData && serverData.veiculos && serverData.veiculos.length > 0) {
+            state = serverData;
+            localStorage.setItem('lm_state_v1', JSON.stringify(state));
+            return;
+        }
+    } catch (e) {
+        console.warn('Servidor indisponível no momento, buscando cache local...');
+    }
+
+    // 2. Fallback: usa o localStorage caso o servidor não responda
     const salvoLocal = localStorage.getItem('lm_state_v1');
     if (salvoLocal) {
         state = JSON.parse(salvoLocal);
-        return;
-    }
-    try {
-        const res = await fetch('/api/dados');
-        const serverData = await res.json();
-        if (serverData && serverData.veiculos && serverData.veiculos.length >= 10) {
-            state = serverData;
-        } else {
-            state = fallbackData;
-            await salvarEstado();
-        }
-    } catch (e) {
+    } else {
         state = fallbackData;
+        await salvarEstado();
     }
 }
 
@@ -485,16 +490,27 @@ function renderizarMotoristas() {
     }).join('');
 }
 
-// 5. Clientes Corporativos
+// 5. Clientes Corporativos (Oculta Inativos por padrão)
 function renderizarClientes() {
     const busca = (document.getElementById('searchCliente')?.value || '').toLowerCase();
-    const filtrados = state.clientes.filter(c =>
-        c.empresa.toLowerCase().includes(busca) ||
-        c.contato.toLowerCase().includes(busca) ||
-        c.telefone.includes(busca)
-    );
+    const filtroStatus = document.getElementById('filterStatusCliente')?.value || 'Ativo';
+
+    const filtrados = state.clientes.filter(c => {
+        const matchTexto =
+            c.empresa.toLowerCase().includes(busca) ||
+            c.contato.toLowerCase().includes(busca) ||
+            c.telefone.includes(busca);
+
+        const matchStatus = filtroStatus === 'Todos' ? true : c.status === filtroStatus;
+        return matchTexto && matchStatus;
+    });
 
     const grid = document.getElementById('clientesGrid');
+    if (filtrados.length === 0) {
+        grid.innerHTML = `<div class="card" style="grid-column: 1 / -1; text-align:center; color:var(--text-muted); padding: 28px;">Nenhum cliente encontrado para este filtro.</div>`;
+        return;
+    }
+
     grid.innerHTML = filtrados.map(c => `
         <div class="card client-card">
             <div>
@@ -514,7 +530,7 @@ function renderizarClientes() {
     `).join('');
 }
 
-// 6. Rotas
+// 6. Rotas (Oculta Finalizadas por padrão)
 function renderizarRotas() {
     const total = state.rotas.length;
     const andamento = state.rotas.filter(r => r.status === 'Em andamento').length;
@@ -522,8 +538,31 @@ function renderizarRotas() {
     document.getElementById('rotasTotalCount').textContent = total;
     document.getElementById('rotasAndamentoCount').textContent = andamento;
 
+    const busca = (document.getElementById('searchRota')?.value || '').toLowerCase();
+    const filtroStatus = document.getElementById('filterStatusRota')?.value || 'Em andamento';
+
+    const rotasFiltradas = state.rotas.filter(r => {
+        const cli = state.clientes.find(c => c.id === Number(r.clienteId)) || { empresa: '' };
+        const vei = state.veiculos.find(v => v.id === Number(r.veiculoId)) || { modelo: '', placa: '' };
+        const mot = state.motoristas.find(m => m.id === Number(r.motoristaId)) || { nome: '' };
+
+        const matchStatus = filtroStatus === 'Todos' ? true : r.status === filtroStatus;
+        const matchBusca =
+            cli.empresa.toLowerCase().includes(busca) ||
+            vei.placa.toLowerCase().includes(busca) ||
+            vei.modelo.toLowerCase().includes(busca) ||
+            mot.nome.toLowerCase().includes(busca);
+
+        return matchStatus && matchBusca;
+    });
+
     const container = document.getElementById('listaRotasContainer');
-    container.innerHTML = state.rotas.map(r => {
+    if (rotasFiltradas.length === 0) {
+        container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding: 28px;">Nenhuma rota encontrada para este filtro.</div>`;
+        return;
+    }
+
+    container.innerHTML = rotasFiltradas.map(r => {
         const cli = state.clientes.find(c => c.id === Number(r.clienteId)) || { empresa: 'Cliente' };
         const vei = state.veiculos.find(v => v.id === Number(r.veiculoId)) || { modelo: 'Veículo', placa: '' };
         const mot = state.motoristas.find(m => m.id === Number(r.motoristaId)) || { nome: 'Motorista' };
@@ -659,12 +698,15 @@ function renderizarManutencoesERelatorios() {
     document.getElementById('relCnhVenc').textContent = `• ${venc} motorista${venc !== 1 ? 's' : ''}`;
 }
 
-// Filtros em tempo real (incluindo Manutenções)
+// Filtros em tempo real (Frota, Motoristas, Clientes, Rotas e Manutenções)
 function configurarFiltros() {
     document.getElementById('searchFrota')?.addEventListener('input', renderizarFrota);
     document.getElementById('filterStatusFrota')?.addEventListener('change', renderizarFrota);
     document.getElementById('searchMotorista')?.addEventListener('input', renderizarMotoristas);
     document.getElementById('searchCliente')?.addEventListener('input', renderizarClientes);
+    document.getElementById('filterStatusCliente')?.addEventListener('change', renderizarClientes);
+    document.getElementById('searchRota')?.addEventListener('input', renderizarRotas);
+    document.getElementById('filterStatusRota')?.addEventListener('change', renderizarRotas);
     document.getElementById('searchManutencao')?.addEventListener('input', renderizarManutencoesERelatorios);
     document.getElementById('filterStatusManutencao')?.addEventListener('change', renderizarManutencoesERelatorios);
 }
@@ -962,13 +1004,15 @@ function abrirModalCliente(id = null) {
     });
 }
 
-// Modal: Rotas
+// Modal: Rotas (Ocultando clientes inativos, veículos indisponíveis e bloqueando CNH irregular)
 function abrirModalRota(id = null) {
+    const clientePadrao = state.clientes.find(c => c.status === 'Ativo') || state.clientes[0];
+
     const r = state.rotas.find(item => item.id === id) || {
-        clienteId: state.clientes[0]?.id || 1,
+        clienteId: clientePadrao ? clientePadrao.id : 1,
         veiculoId: '',
         motoristaId: '',
-        data: '2026-09-28',
+        data: typeof obterDataHojeISO === 'function' ? obterDataHojeISO() : '2026-09-28',
         periodo: 'Manhã',
         horaInicio: '08:00',
         horaFim: '10:00',
@@ -988,7 +1032,10 @@ function abrirModalRota(id = null) {
             <div class="form-group">
                 <label>Cliente Corporativo</label>
                 <select id="rCliente" required>
-                    ${state.clientes.map(c => `<option value="${c.id}" ${Number(r.clienteId) === c.id ? 'selected' : ''}>${c.empresa} (${c.status})</option>`).join('')}
+                    ${state.clientes
+                        .filter(c => c.status === 'Ativo' || Number(r.clienteId) === c.id)
+                        .map(c => `<option value="${c.id}" ${Number(r.clienteId) === c.id ? 'selected' : ''}>${c.empresa} (${c.status})</option>`)
+                        .join('')}
                 </select>
             </div>
             <div class="form-group">

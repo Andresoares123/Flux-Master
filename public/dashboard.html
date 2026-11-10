@@ -371,6 +371,11 @@
                     <span>🔍</span>
                     <input type="text" id="searchCliente" placeholder="Buscar por empresa, contato ou telefone...">
                 </div>
+                <select id="filterStatusCliente" class="filter-select">
+                    <option value="Ativo">Apenas Ativos (Ocultar inativos)</option>
+                    <option value="Inativo">Apenas Inativos</option>
+                    <option value="Todos">Todos os clientes</option>
+                </select>
             </div>
 
             <div class="clients-grid" id="clientesGrid"></div>
@@ -397,10 +402,22 @@
                 </div>
             </div>
 
+            <div class="filter-bar">
+                <div class="search-input-wrap">
+                    <span>🔍</span>
+                    <input type="text" id="searchRota" placeholder="Buscar por cliente, motorista ou placa...">
+                </div>
+                <select id="filterStatusRota" class="filter-select">
+                    <option value="Em andamento">Em andamento (Ocultar finalizadas)</option>
+                    <option value="Finalizada">Apenas Finalizadas</option>
+                    <option value="Todos">Todas as rotas</option>
+                </select>
+            </div>
+
             <div class="table-card">
                 <div style="text-align: center; padding: 18px; border-bottom: 1px solid var(--border);">
                     <strong style="font-size: 13px; letter-spacing: 0.5px;">ROTAS DO DIA</strong>
-                    <p style="font-size: 11.5px; color: var(--text-muted);">28 de setembro de 2026</p>
+                    <p id="rotasDateSub" style="font-size: 11.5px; color: var(--text-muted);"></p>
                 </div>
                 <div id="listaRotasContainer"></div>
             </div>
