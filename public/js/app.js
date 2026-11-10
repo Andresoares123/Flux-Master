@@ -352,7 +352,42 @@ function abrirNotificacoesPeloBanner(e) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// 2. Dashboard (Calculado apenas sobre veículos que estão na empresa)
+// Auxiliar: Gera a lista dos últimos N meses a partir da data atual do computador e soma os gastos de manutenção
+function calcularCustosUltimosMeses(qtdMeses) {
+    const nomesMeses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const hoje = new Date();
+    const resultado = [];
+
+    for (let i = qtdMeses - 1; i >= 0; i--) {
+        const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+        const ano = d.getFullYear();
+        const mesIndex = d.getMonth();
+        const chaveAnoMes = `${ano}-${String(mesIndex + 1).padStart(2, '0')}`;
+
+        const somaMes = state.manutencoes.reduce((acc, m) => {
+            if (m.data && m.data.startsWith(chaveAnoMes)) {
+                return acc + Number(m.custo || 0);
+            }
+            return acc;
+        }, 0);
+
+        resultado.push({
+            chave: chaveAnoMes,
+            nome: nomesMeses[mesIndex],
+            valor: somaMes
+        });
+    }
+    return resultado;
+}
+
+function formatarValorCurto(val) {
+    if (val >= 1000) {
+        return `R$ ${(val / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}k`;
+    }
+    return `R$ ${val.toLocaleString('pt-BR')}`;
+}
+
+// 2. Dashboard (Calculado sobre veículos ativos e meses reais)
 function renderizarDashboard() {
     const frotaEmpresa = state.veiculos.filter(v => v.status !== 'Vendido');
     const totalV = frotaEmpresa.length;
@@ -367,6 +402,27 @@ function renderizarDashboard() {
     document.getElementById('dashDonutRing').style.background = `conic-gradient(var(--success) 0% ${pct}%, #E2E8F0 ${pct}% 100%)`;
     document.getElementById('dashLegDisp').textContent = dispV;
     document.getElementById('dashLegManut').textContent = manutV;
+
+    // Custos dos últimos 4 meses dinâmicos
+    const ultimos4 = calcularCustosUltimosMeses(4);
+    const maiorValor = Math.max(...ultimos4.map(m => m.valor), 1);
+
+    const pillarsEl = document.getElementById('dashCostPillars');
+    if (pillarsEl) {
+        pillarsEl.innerHTML = ultimos4.map((m, idx) => {
+            const alturaPct = m.valor > 0 ? Math.max(Math.round((m.valor / maiorValor) * 90), 12) : 6;
+            const isUltimo = idx === ultimos4.length - 1;
+            return `
+                <div class="cost-pillar-item">
+                    <strong>${formatarValorCurto(m.valor)}</strong>
+                    <div class="cost-pillar-box">
+                        <div class="cost-pillar-inner ${isUltimo ? 'active' : ''}" style="height: ${alturaPct}%;"></div>
+                    </div>
+                    <span>${m.nome}</span>
+                </div>
+            `;
+        }).join('');
+    }
 
     const totalGasto = state.manutencoes.reduce((acc, m) => acc + Number(m.custo || 0), 0);
     const gastoFormatado = `R$ ${totalGasto.toLocaleString('pt-BR')}`;
@@ -599,6 +655,7 @@ function renderizarRotas() {
 }
 
 // 7. Manutenções e Relatórios (Com Código Fixo, Filtros e Edição de Status ao clicar)
+// 7. Manutenções e Relatórios (Com Gráficos de 3 Meses e Categorias 100% Dinâmicos)
 function renderizarManutencoesERelatorios() {
     state.manutencoes.forEach((m, index) => {
         if (!m.codigo) {
@@ -606,12 +663,13 @@ function renderizarManutencoesERelatorios() {
         }
     });
 
+    const frotaEmpresa = state.veiculos.filter(v => v.status !== 'Vendido');
     const totalCusto = state.manutencoes.reduce((acc, m) => acc + Number(m.custo || 0), 0);
-    const custoMedio = state.veiculos.length > 0 ? Math.round(totalCusto / state.veiculos.length) : 0;
+    const custoMedio = frotaEmpresa.length > 0 ? Math.round(totalCusto / frotaEmpresa.length) : 0;
 
     const qtdConcluidos = state.manutencoes.filter(m => m.status === 'Concluído').length;
     const qtdAbertos = state.manutencoes.filter(m => m.status !== 'Concluído').length;
-    const totalServicosExibicao = state.manutencoes.length < 14 ? 14 : state.manutencoes.length;
+    const totalServicosExibicao = state.manutencoes.length;
 
     document.getElementById('manutGastoTotal').textContent = `R$ ${totalCusto.toLocaleString('pt-BR')}`;
     document.getElementById('manutCustoMedio').textContent = `R$ ${custoMedio.toLocaleString('pt-BR')}`;
@@ -622,6 +680,69 @@ function renderizarManutencoesERelatorios() {
     document.getElementById('relCustoMedio').textContent = `R$ ${custoMedio.toLocaleString('pt-BR')}`;
     document.getElementById('relServicosTotal').textContent = totalServicosExibicao;
 
+    // 1. Gráfico Dinâmico: Evolução nos últimos 3 meses (Aba Relatórios)
+    const ultimos3 = calcularCustosUltimosMeses(3);
+    const max3M = Math.max(...ultimos3.map(m => m.valor), 1);
+    const container3M = document.getElementById('relCostPillars3M');
+    if (container3M) {
+        container3M.innerHTML = ultimos3.map(m => {
+            const alturaPct = m.valor > 0 ? Math.max(Math.round((m.valor / max3M) * 90), 12) : 6;
+            return `
+                <div>
+                    <strong style="display:block; font-size:11.5px; margin-bottom:6px;">${formatarValorCurto(m.valor)}</strong>
+                    <div style="height: 90px; background: #EFF6FF; border-radius: 8px; display:flex; align-items:flex-end; overflow:hidden;">
+                        <div style="width:100%; height: ${alturaPct}%; background: var(--navy); border-radius: 6px; transition: height 0.3s;"></div>
+                    </div>
+                    <small style="display:block; margin-top:8px; color:var(--text-muted); font-weight:600;">${m.nome}</small>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // 2. Gráfico Dinâmico: Custos por Categoria (Inclui Pneus, Freios, Preventiva, Troca de óleo, Motor / marcha)
+    const containerCat = document.getElementById('relCategoriasContainer');
+    if (containerCat) {
+        const mapaCores = {
+            'Pneus': 'var(--blue-light)',
+            'Sistema de freios': 'var(--navy)',
+            'Preventiva': 'var(--success)',
+            'Troca de óleo': 'var(--warning)',
+            'Motor / marcha': 'var(--danger)'
+        };
+
+        const somaPorCategoria = {};
+        state.manutencoes.forEach(m => {
+            const cat = m.tipo || 'Outros';
+            somaPorCategoria[cat] = (somaPorCategoria[cat] || 0) + Number(m.custo || 0);
+        });
+
+        const listaCategorias = Object.entries(somaPorCategoria)
+            .map(([nome, valor]) => ({
+                nome,
+                valor,
+                pct: totalCusto > 0 ? Math.round((valor / totalCusto) * 100) : 0,
+                cor: mapaCores[nome] || 'var(--blue-light)'
+            }))
+            .sort((a, b) => b.valor - a.valor);
+
+        if (listaCategorias.length === 0) {
+            containerCat.innerHTML = `<p style="color:var(--text-muted); font-size:12px;">Nenhum custo registrado.</p>`;
+        } else {
+            containerCat.innerHTML = listaCategorias.map(item => `
+                <div class="progress-group" style="margin-bottom: 12px;">
+                    <div class="progress-label">
+                        <span>${item.nome} <small style="color:var(--text-muted); font-weight:400;">(R$ ${item.valor.toLocaleString('pt-BR')})</small></span>
+                        <span>${item.pct}%</span>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-bar" style="width: ${item.pct}%; background: ${item.cor}; transition: width 0.3s;"></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+    }
+
+    // 3. Filtros e Tabela de Histórico de Serviços
     const termoBusca = (document.getElementById('searchManutencao')?.value || '').trim().toLowerCase();
     const filtroStatus = document.getElementById('filterStatusManutencao')?.value || 'Pendentes';
 
@@ -686,6 +807,7 @@ function renderizarManutencoesERelatorios() {
     document.getElementById('tabelaManutencoesBody').innerHTML = gerarLinhasHTML(manutencoesFiltradas);
     document.getElementById('tabelaRelatoriosBody').innerHTML = gerarLinhasHTML(state.manutencoes);
 
+    // 4. Resumo CNH no Relatório
     let reg = 0, alert = 0, venc = 0;
     state.motoristas.forEach(m => {
         const st = obterStatusCNH(m.validade);

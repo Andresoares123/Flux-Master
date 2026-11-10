@@ -206,7 +206,7 @@
                     </div>
                 </div>
 
-                <!-- Custos de Manutenção -->
+                <!-- Custos de Manutenção (Dinâmico 4 meses) -->
                 <div class="card">
                     <div class="chart-header">
                         <div>
@@ -215,34 +215,13 @@
                         </div>
                         <button class="ver-link" onclick="navegarPara('manutencoes')">Ver ›</button>
                     </div>
-                    <div class="cost-pillars">
-                        <div class="cost-pillar-item">
-                            <strong>R$ 6,2k</strong>
-                            <div class="cost-pillar-box"><div class="cost-pillar-inner" style="height: 55%;"></div></div>
-                            <span>Jun</span>
-                        </div>
-                        <div class="cost-pillar-item">
-                            <strong>R$ 8,9k</strong>
-                            <div class="cost-pillar-box"><div class="cost-pillar-inner" style="height: 85%;"></div></div>
-                            <span>Jul</span>
-                        </div>
-                        <div class="cost-pillar-item">
-                            <strong>R$ 8,7k</strong>
-                            <div class="cost-pillar-box"><div class="cost-pillar-inner" style="height: 80%;"></div></div>
-                            <span>Ago</span>
-                        </div>
-                        <div class="cost-pillar-item">
-                            <strong id="dashPilarSet">R$ 7,7k</strong>
-                            <div class="cost-pillar-box"><div class="cost-pillar-inner active" style="height: 70%;"></div></div>
-                            <span>Set</span>
-                        </div>
-                    </div>
+                    <div class="cost-pillars" id="dashCostPillars"></div>
                     <div class="chart-footer-note orange">
                         <div>
-                            <small style="display:block; font-size:11px;">Custo em setembro</small>
-                            <strong id="dashFooterCusto" style="font-size:14px;">R$ 7.730</strong>
+                            <small id="dashFooterMesLabel" style="display:block; font-size:11px;">Total acumulado</small>
+                            <strong id="dashFooterCusto" style="font-size:14px;">R$ 0</strong>
                         </div>
-                        <span class="badge green">↓ 12% no mês</span>
+                        <span class="badge green" id="dashFooterTrend">Atualizado</span>
                     </div>
                 </div>
             </div>
@@ -548,7 +527,7 @@
             </div>
 
             <div class="grid-3">
-                <!-- Evolução 3 meses -->
+                <!-- Evolução 3 meses (Dinâmico) -->
                 <div class="card">
                     <div class="chart-header">
                         <div>
@@ -556,26 +535,7 @@
                             <p>Evolução nos últimos 3 meses</p>
                         </div>
                     </div>
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 28px; text-align: center;">
-                        <div>
-                            <div style="height: 90px; background: #EFF6FF; border-radius: 8px; display:flex; align-items:flex-end;">
-                                <div style="width:100%; height: 75%; background: var(--navy); border-radius: 6px;"></div>
-                            </div>
-                            <small style="display:block; margin-top:8px; color:var(--text-muted);">Jul</small>
-                        </div>
-                        <div>
-                            <div style="height: 90px; background: #EFF6FF; border-radius: 8px; display:flex; align-items:flex-end;">
-                                <div style="width:100%; height: 70%; background: var(--navy); border-radius: 6px;"></div>
-                            </div>
-                            <small style="display:block; margin-top:8px; color:var(--text-muted);">Ago</small>
-                        </div>
-                        <div>
-                            <div style="height: 90px; background: #EFF6FF; border-radius: 8px; display:flex; align-items:flex-end;">
-                                <div style="width:100%; height: 58%; background: var(--navy); border-radius: 6px;"></div>
-                            </div>
-                            <small style="display:block; margin-top:8px; color:var(--text-muted);">Set</small>
-                        </div>
-                    </div>
+                    <div id="relCostPillars3M" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; text-align: center;"></div>
                 </div>
 
                 <!-- Validades CNH -->
@@ -589,38 +549,28 @@
                     <div style="display:flex; flex-direction:column; gap: 10px;">
                         <div class="chart-footer-note green">
                             <strong>Regulares</strong>
-                            <span id="relCnhReg">• 2 motoristas</span>
+                            <span id="relCnhReg">• 0 motoristas</span>
                         </div>
                         <div class="chart-footer-note orange">
                             <strong>Próximas do vencimento</strong>
-                            <span id="relCnhAlert">• 2 motoristas</span>
+                            <span id="relCnhAlert">• 0 motoristas</span>
                         </div>
                         <div class="chart-footer-note" style="background: var(--danger-bg); color: #991B1B;">
                             <strong>Vencidas</strong>
-                            <span id="relCnhVenc">• 1 motorista</span>
+                            <span id="relCnhVenc">• 0 motoristas</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Custos por Categoria -->
+                <!-- Custos por Categoria (Dinâmico com Motor/marcha, Óleo, etc.) -->
                 <div class="card">
                     <div class="chart-header">
                         <div>
                             <h3>Custos por categoria</h3>
+                            <p>Distribuição real por tipo de serviço</p>
                         </div>
                     </div>
-                    <div class="progress-group">
-                        <div class="progress-label"><span>Pneus</span><span id="pctPneus">42%</span></div>
-                        <div class="progress-track"><div id="barPneus" class="progress-bar" style="width: 42%; background: var(--blue-light);"></div></div>
-                    </div>
-                    <div class="progress-group">
-                        <div class="progress-label"><span>Freios</span><span id="pctFreios">32%</span></div>
-                        <div class="progress-track"><div id="barFreios" class="progress-bar" style="width: 32%; background: var(--navy);"></div></div>
-                    </div>
-                    <div class="progress-group">
-                        <div class="progress-label"><span>Preventiva</span><span id="pctPrev">26%</span></div>
-                        <div class="progress-track"><div id="barPrev" class="progress-bar" style="width: 26%; background: var(--success);"></div></div>
-                    </div>
+                    <div id="relCategoriasContainer"></div>
                 </div>
             </div>
 
