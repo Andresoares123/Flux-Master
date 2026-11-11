@@ -33,32 +33,94 @@ function atualizarRelogioCabecalho() {
     if (elSaudacao) elSaudacao.textContent = saudacao;
 }
 
-// Automação de Ciclo Diário: Alterna entre "Agendada" e "Em andamento" conforme o horário do PC.
-// Só fica "Finalizada" quando o proprietário encerrar manualmente o contrato da rota.
+// Automação de Ciclo Diário: Rotas + Manutenções + Sincronização da Frota
 async function verificarStatusRotasAutomatico() {
-    if (!state || !state.rotas || state.rotas.length === 0) return;
+    if (!state || !state.rotas || !state.veiculos) return;
 
     const agora = new Date();
+    const hojeISO = obterDataHojeISO();
     const minutosAgora = agora.getHours() * 60 + agora.getMinutes();
-
     let houveMudanca = false;
 
+    // 1. Automação das Manutenções:
+    // - Se não está Concluído e a data é futura (> hojeISO) -> fica "Agendado"
+    // - Se não está Concluído e chegou o dia (<= hojeISO) -> passa automaticamente para "Em andamento"
+    if (state.manutencoes) {
+        state.manutencoes.forEach(m => {
+            if (m.status === 'Concluído' || !m.data) return;
+
+            if (m.data > hojeISO && m.status !== 'Agendado') {
+                m.status = 'Agendado';
+                houveMudanca = true;
+            } else if (m.data <= hojeISO && m.status === 'Agendado') {
+                m.status = 'Em andamento';
+                houveMudanca = true;
+            }
+        });
+    }
+
+    // 2. Atualiza o ciclo das rotas (Agendada <-> Em andamento) conforme horário do PC
     state.rotas.forEach(r => {
-        // Se o proprietário já encerrou o contrato (Finalizada), não entra no ciclo automático
         if (r.status === 'Finalizada') return;
         if (!r.horaInicio || !r.horaFim) return;
+
+        // Correção de integridade: se a rota ativa apontava para um veículo "Vendido", realoca
+        const veiculoDaRota = state.veiculos.find(v => v.id === Number(r.veiculoId));
+        if (veiculoDaRota && veiculoDaRota.status === 'Vendido') {
+            const substituto = state.veiculos.find(v => v.status === 'Disponível');
+            if (substituto) {
+                r.veiculoId = substituto.id;
+                houveMudanca = true;
+            }
+        }
 
         const [hIni, mIni] = r.horaInicio.split(':').map(Number);
         const [hFim, mFim] = r.horaFim.split(':').map(Number);
         const minInicio = hIni * 60 + mIni;
         const minFim = hFim * 60 + mFim;
 
-        // Verifica se o horário atual do computador está dentro da janela da rota
         const estaNoHorario = minutosAgora >= minInicio && minutosAgora < minFim;
         const novoStatus = estaNoHorario ? 'Em andamento' : 'Agendada';
 
         if (r.status !== novoStatus) {
             r.status = novoStatus;
+            houveMudanca = true;
+        }
+    });
+
+    // 3. Sincroniza o status de cada veículo na Frota com as Rotas e Manutenções reais
+    state.veiculos.forEach(v => {
+        if (v.status === 'Vendido') return;
+
+        // Só bloqueia o veículo na frota se a manutenção estiver "Em andamento" hoje!
+        // (Se estiver apenas "Agendado" para amanhã, o veículo segue Disponível hoje)
+        const temManutencaoEmAndamento = state.manutencoes && state.manutencoes.some(
+            m => m.placa === v.placa && m.status === 'Em andamento'
+        );
+        const temRotaEmAndamento = state.rotas.some(
+            r => Number(r.veiculoId) === v.id && r.status === 'Em andamento'
+        );
+        const temRotaAgendada = state.rotas.some(
+            r => Number(r.veiculoId) === v.id && r.status === 'Agendada'
+        );
+
+        let statusCorreto = v.status;
+
+        if (temManutencaoEmAndamento) {
+            statusCorreto = 'Em manutenção';
+        } else if (temRotaEmAndamento) {
+            statusCorreto = 'Em rota';
+        } else if (temRotaAgendada && v.status === 'Inativo') {
+            statusCorreto = 'Disponível';
+        } else if (!temManutencaoEmAndamento && v.status === 'Em manutenção') {
+            // Assim que a manutenção é marcada como "Concluído" (ou "Agendado" para o futuro), o veículo volta a ficar Disponível!
+            statusCorreto = 'Disponível';
+        } else if (!temRotaEmAndamento && v.status === 'Em rota') {
+            statusCorreto = 'Disponível';
+        }
+
+        if (v.status !== statusCorreto) {
+            v.status = statusCorreto;
             houveMudanca = true;
         }
     });
@@ -1056,73 +1118,89 @@ function abrirModalVeiculo() {
     });
 }
 
-// Modal: Controle Veicular
+// 2. Modal Unificado de Controle do Veículo (Com Trava de Segurança contra Inativação/Venda se estiver em Rota)
 function abrirModalControleVeiculo(id) {
     const v = state.veiculos.find(item => item.id === id);
     if (!v) return;
 
-    const doc = v.documentos || {};
-    const km = v.km || { atual: 0, dataConferencia: '', proxTrocaOleo: 10000, obs: '' };
+    const docs = v.docs || { crlv: '', seguro: '', tacografo: '', revisao: '' };
+    const km = v.km || { atual: 10000, proxTrocaOleo: 20000, ultimaAtualizacao: '2026-09-28' };
 
-    abrirModal(`Controle do Veículo: ${v.placa}`, `
+    // Verifica se o veículo está preso em alguma rota ativa (Em andamento ou Agendada)
+    const rotaVinculada = state.rotas.find(r => Number(r.veiculoId) === v.id && r.status !== 'Finalizada');
+    const clienteRota = rotaVinculada ? state.clientes.find(c => c.id === Number(rotaVinculada.clienteId)) : null;
+
+    abrirModal(`Controle Operacional — ${v.placa}`, `
         <form id="formControleVeiculo">
-            <div class="grid-2">
-                <div class="form-group">
-                    <label>Modelo</label>
-                    <input type="text" id="ctrlModelo" value="${v.modelo}" required>
-                </div>
-                <div class="form-group">
-                    <label>Status Operacional</label>
-                    <select id="ctrlStatus">
-                        <option value="Disponível" ${v.status === 'Disponível' ? 'selected' : ''}>Disponível</option>
-                        <option value="Em manutenção" ${v.status === 'Em manutenção' ? 'selected' : ''}>Em manutenção</option>
-                        <option value="Em rota" ${v.status === 'Em rota' ? 'selected' : ''}>Em rota</option>
-                        <option value="Inativo" ${v.status === 'Inativo' ? 'selected' : ''}>Inativo</option>
-                        <option value="Vendido" ${v.status === 'Vendido' ? 'selected' : ''}>Vendido</option>
-                    </select>
-                </div>
-            </div>
-
-            <h4 style="margin: 12px 0 8px; font-size: 13px; color: var(--navy);">Documentação (IPVA, Licenciamento, SPVAT, SELO)</h4>
-            ${['ipva', 'licenciamento', 'spvat', 'selo'].map(tipo => `
-                <div style="border:1px solid var(--border); border-radius:8px; padding:10px; margin-bottom:8px;">
-                    <strong style="font-size:12px; text-transform:uppercase;">${tipo}</strong>
-                    <div class="grid-3" style="margin-top:6px; margin-bottom:0; gap:8px;">
-                        <div class="form-group" style="margin:0;">
-                            <label style="font-size:10px;">Vencimento</label>
-                            <input type="date" id="doc_${tipo}_venc" value="${doc[tipo]?.vencimento || ''}">
-                        </div>
-                        <div class="form-group" style="margin:0;">
-                            <label style="font-size:10px;">Valor Pago (R$)</label>
-                            <input type="number" step="0.01" id="doc_${tipo}_val" value="${doc[tipo]?.valor || 0}">
-                        </div>
-                        <div class="form-group" style="margin:0;">
-                            <label style="font-size:10px;">Observação</label>
-                            <input type="text" id="doc_${tipo}_obs" value="${doc[tipo]?.obs || ''}">
-                        </div>
+            <div style="background: var(--bg-body); padding: 12px 14px; border-radius: 10px; margin-bottom: 14px; border: 1px solid var(--border);">
+                <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">1. Dados Cadastrais e Status</label>
+                <div class="grid-2" style="margin-top: 8px; margin-bottom: 0;">
+                    <div class="form-group" style="margin-bottom:8px;">
+                        <label>Modelo</label>
+                        <input type="text" id="ctrlModelo" value="${v.modelo}" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom:8px;">
+                        <label>Status na Frota</label>
+                        <select id="ctrlStatus">
+                            <option value="Disponível" ${v.status === 'Disponível' ? 'selected' : ''}>Disponível</option>
+                            <option value="Em rota" ${v.status === 'Em rota' ? 'selected' : ''}>Em rota</option>
+                            <option value="Em manutenção" ${v.status === 'Em manutenção' ? 'selected' : ''}>Em manutenção</option>
+                            <option value="Inativo" ${v.status === 'Inativo' ? 'selected' : ''}>Inativo</option>
+                            <option value="Vendido" ${v.status === 'Vendido' ? 'selected' : ''}>Vendido (Fora da frota)</option>
+                        </select>
                     </div>
                 </div>
-            `).join('')}
+                <div class="grid-2" style="margin-bottom: 0;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Ano</label>
+                        <input type="number" id="ctrlAno" value="${v.ano}" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Capacidade (Passageiros)</label>
+                        <input type="number" id="ctrlCap" value="${v.capacidade}" required>
+                    </div>
+                </div>
+            </div>
 
-            <h4 style="margin: 14px 0 8px; font-size: 13px; color: var(--navy);">Controle de Quilometragem</h4>
-            <div class="grid-3" style="gap:10px;">
-                <div class="form-group">
-                    <label>KM Atual</label>
-                    <input type="number" id="kmAtual" value="${km.atual}">
-                </div>
-                <div class="form-group">
-                    <label>Próx. Troca de Óleo (KM)</label>
-                    <input type="number" id="kmProx" value="${km.proxTrocaOleo}">
-                </div>
-                <div class="form-group">
-                    <label>Data Conferência</label>
-                    <input type="date" id="kmData" value="${km.dataConferencia}">
+            <div style="background: var(--bg-body); padding: 12px 14px; border-radius: 10px; margin-bottom: 14px; border: 1px solid var(--border);">
+                <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">2. Controle de Quilometragem (KM)</label>
+                <div class="grid-2" style="margin-top: 8px; margin-bottom: 0;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>KM Atual no Odômetro</label>
+                        <input type="number" id="ctrlKmAtual" value="${km.atual}" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>KM Próxima Troca de Óleo</label>
+                        <input type="number" id="ctrlKmOleo" value="${km.proxTrocaOleo}" required>
+                    </div>
                 </div>
             </div>
-            <div class="form-group">
-                <label>Observação de KM / Revisão</label>
-                <input type="text" id="kmObs" value="${km.obs || ''}">
+
+            <div style="background: var(--bg-body); padding: 12px 14px; border-radius: 10px; margin-bottom: 12px; border: 1px solid var(--border);">
+                <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">3. Vencimentos de Documentação</label>
+                <div class="grid-2" style="margin-top: 8px; margin-bottom: 0;">
+                    <div class="form-group" style="margin-bottom:8px;">
+                        <label>Licenciamento / CRLV</label>
+                        <input type="date" id="ctrlCrlv" value="${docs.crlv}">
+                    </div>
+                    <div class="form-group" style="margin-bottom:8px;">
+                        <label>Seguro da Frota</label>
+                        <input type="date" id="ctrlSeguro" value="${docs.seguro}">
+                    </div>
+                </div>
+                <div class="grid-2" style="margin-bottom: 0;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Aferição do Tacógrafo</label>
+                        <input type="date" id="ctrlTacografo" value="${docs.tacografo}">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Revisão Preventiva</label>
+                        <input type="date" id="ctrlRevisao" value="${docs.revisao}">
+                    </div>
+                </div>
             </div>
+
+            <p class="error-msg" id="veiculoBlockError" style="display:none;"></p>
 
             <div class="modal-footer">
                 <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
@@ -1133,54 +1211,83 @@ function abrirModalControleVeiculo(id) {
 
     document.getElementById('formControleVeiculo').addEventListener('submit', async (e) => {
         e.preventDefault();
-        v.modelo = document.getElementById('ctrlModelo').value;
-        v.status = document.getElementById('ctrlStatus').value;
+        const novoStatus = document.getElementById('ctrlStatus').value;
+        const errEl = document.getElementById('veiculoBlockError');
+        errEl.style.display = 'none';
 
-        ['ipva', 'licenciamento', 'spvat', 'selo'].forEach(tipo => {
-            v.documentos[tipo] = {
-                vencimento: document.getElementById(`doc_${tipo}_venc`).value,
-                valor: Number(document.getElementById(`doc_${tipo}_val`).value || 0),
-                obs: document.getElementById(`doc_${tipo}_obs`).value
-            };
-        });
+        // TRAVA DE PRODUÇÃO 1: Impede inativar, vender ou colocar em manutenção se o veículo estiver em uma rota ativa
+        if (rotaVinculada && ['Inativo', 'Vendido', 'Em manutenção'].includes(novoStatus)) {
+            const nomeCli = clienteRota ? clienteRota.empresa : 'Cliente';
+            errEl.textContent = `Ação bloqueada: Este veículo está vinculado à rota ativa (${rotaVinculada.status}) de "${nomeCli}". Altere o veículo da rota ou finalize-a antes de mudar para ${novoStatus}.`;
+            errEl.style.display = 'block';
+            return;
+        }
+
+        // TRAVA DE PRODUÇÃO 2: Não permite marcar manualmente "Disponível" se ele está "Em andamento" numa rota agora
+        if (rotaVinculada && rotaVinculada.status === 'Em andamento' && novoStatus !== 'Em rota') {
+            errEl.textContent = `Ação bloqueada: O veículo está realizando uma viagem "Em andamento" neste momento e seu status deve permanecer "Em rota".`;
+            errEl.style.display = 'block';
+            return;
+        }
+
+        v.modelo = document.getElementById('ctrlModelo').value.trim();
+        v.status = novoStatus;
+        v.ano = Number(document.getElementById('ctrlAno').value);
+        v.capacidade = Number(document.getElementById('ctrlCap').value);
 
         v.km = {
-            atual: Number(document.getElementById('kmAtual').value || 0),
-            proxTrocaOleo: Number(document.getElementById('kmProx').value || 0),
-            dataConferencia: document.getElementById('kmData').value,
-            obs: document.getElementById('kmObs').value
+            atual: Number(document.getElementById('ctrlKmAtual').value),
+            proxTrocaOleo: Number(document.getElementById('ctrlKmOleo').value),
+            ultimaAtualizacao: typeof obterDataHojeISO === 'function' ? obterDataHojeISO() : '2026-11-11'
         };
 
+        v.docs = {
+            crlv: document.getElementById('ctrlCrlv').value,
+            seguro: document.getElementById('ctrlSeguro').value,
+            tacografo: document.getElementById('ctrlTacografo').value,
+            revisao: document.getElementById('ctrlRevisao').value
+        };
+
+        await verificarStatusRotasAutomatico();
         await salvarEstado();
         fecharModal();
         renderizarTudo();
     });
 }
 
-// Modal: Motorista
+// Modal: Motorista (Com trava se estiver em rota ativa)
 function abrirModalMotorista(id = null) {
-    const m = state.motoristas.find(item => item.id === id) || { nome: '', cnh: '', categoria: 'D', validade: '2028-01-01' };
+    const m = state.motoristas.find(item => item.id === id) || {
+        nome: '', telefone: '', cnh: '', categoria: 'D', validade: '2028-05-10'
+    };
 
-    abrirModal(id ? 'Editar Motorista' : 'Novo Motorista', `
+    abrirModal(id ? 'Editar Motorista' : 'Cadastrar Motorista', `
         <form id="formMotorista">
             <div class="form-group">
                 <label>Nome Completo</label>
                 <input type="text" id="mNome" value="${m.nome}" required>
             </div>
-            <div class="grid-3" style="gap:10px;">
+            <div class="grid-2">
                 <div class="form-group">
-                    <label>Número da CNH</label>
+                    <label>Telefone</label>
+                    <input type="text" id="mTel" value="${m.telefone}" placeholder="(11) 99999-0000" required>
+                </div>
+                <div class="form-group">
+                    <label>Categoria CNH</label>
+                    <select id="mCat">
+                        <option value="D" ${m.categoria === 'D' ? 'selected' : ''}>Categoria D</option>
+                        <option value="E" ${m.categoria === 'E' ? 'selected' : ''}>Categoria E</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Registro CNH</label>
                     <input type="text" id="mCnh" value="${m.cnh}" required>
                 </div>
                 <div class="form-group">
-                    <label>Categoria</label>
-                    <select id="mCat">
-                        ${['B', 'C', 'D', 'E'].map(cat => `<option value="${cat}" ${m.categoria === cat ? 'selected' : ''}>${cat}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="form-group">
                     <label>Validade da CNH</label>
-                    <input type="date" id="mVal" value="${m.validade}" required>
+                    <input type="date" id="mValidade" value="${m.validade}" required>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1194,40 +1301,38 @@ function abrirModalMotorista(id = null) {
         e.preventDefault();
         const dados = {
             nome: document.getElementById('mNome').value,
-            cnh: document.getElementById('mCnh').value,
+            telefone: document.getElementById('mTel').value,
             categoria: document.getElementById('mCat').value,
-            validade: document.getElementById('mVal').value
+            cnh: document.getElementById('mCnh').value,
+            validade: document.getElementById('mValidade').value
         };
-        if (id) {
-            Object.assign(m, dados);
-        } else {
-            state.motoristas.push({ id: Date.now(), ...dados });
-        }
+
+        if (id) Object.assign(m, dados);
+        else state.motoristas.push({ id: Date.now(), ...dados });
+
         await salvarEstado();
         fecharModal();
         renderizarTudo();
     });
 }
 
-// Modal: Cliente Corporativo
+// Modal: Cliente Corporativo (Com Trava para impedir inativar cliente com rota ativa)
 function abrirModalCliente(id = null) {
-    const c = state.clientes.find(item => item.id === id) || { empresa: '', iniciais: '', contato: '', telefone: '', obs: '', status: 'Ativo', rotasRealizadas: 0 };
+    const c = state.clientes.find(item => item.id === id) || {
+        empresa: '', contato: '', telefone: '', rotasRealizadas: 0, status: 'Ativo'
+    };
 
-    abrirModal(id ? `Detalhes: ${c.empresa}` : 'Novo Cliente Corporativo', `
+    const rotaAtivaDoCliente = id ? state.rotas.find(r => Number(r.clienteId) === id && r.status !== 'Finalizada') : null;
+
+    abrirModal(id ? 'Detalhes do Cliente' : 'Novo Cliente Corporativo', `
         <form id="formCliente">
-            <div class="grid-2">
-                <div class="form-group">
-                    <label>Nome da Empresa</label>
-                    <input type="text" id="cEmpresa" value="${c.empresa}" required>
-                </div>
-                <div class="form-group">
-                    <label>Iniciais (Card)</label>
-                    <input type="text" id="cIniciais" maxlength="3" value="${c.iniciais}" placeholder="Ex: GH" required>
-                </div>
+            <div class="form-group">
+                <label>Razão Social / Empresa</label>
+                <input type="text" id="cEmpresa" value="${c.empresa}" required>
             </div>
             <div class="grid-2">
                 <div class="form-group">
-                    <label>Nome do Contato</label>
+                    <label>Nome do Responsável</label>
                     <input type="text" id="cContato" value="${c.contato}" required>
                 </div>
                 <div class="form-group">
@@ -1237,21 +1342,18 @@ function abrirModalCliente(id = null) {
             </div>
             <div class="grid-2">
                 <div class="form-group">
-                    <label>Status</label>
+                    <label>Rotas Realizadas</label>
+                    <input type="number" id="cRotas" value="${c.rotasRealizadas}" required>
+                </div>
+                <div class="form-group">
+                    <label>Status do Contrato</label>
                     <select id="cStatus">
                         <option value="Ativo" ${c.status === 'Ativo' ? 'selected' : ''}>Ativo</option>
                         <option value="Inativo" ${c.status === 'Inativo' ? 'selected' : ''}>Inativo</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label>Rotas Realizadas</label>
-                    <input type="number" id="cRotas" value="${c.rotasRealizadas}">
-                </div>
             </div>
-            <div class="form-group">
-                <label>Observações</label>
-                <textarea id="cObs" rows="2">${c.obs || ''}</textarea>
-            </div>
+            <p class="error-msg" id="clienteBlockError" style="display:none;"></p>
             <div class="modal-footer">
                 <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
                 <button type="submit" class="btn-primary">Salvar cliente</button>
@@ -1261,15 +1363,30 @@ function abrirModalCliente(id = null) {
 
     document.getElementById('formCliente').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const novoStatus = document.getElementById('cStatus').value;
+        const errEl = document.getElementById('clienteBlockError');
+        errEl.style.display = 'none';
+
+        // TRAVA DE PRODUÇÃO: Impede inativar cliente que possui rota ativa
+        if (rotaAtivaDoCliente && novoStatus === 'Inativo') {
+            errEl.textContent = `Ação bloqueada: Este cliente possui uma rota ativa (${rotaAtivaDoCliente.status}). Finalize a rota na aba Rotas antes de inativar o contrato do cliente.`;
+            errEl.style.display = 'block';
+            return;
+        }
+
+        const empresa = document.getElementById('cEmpresa').value;
+        const palavras = empresa.trim().split(' ');
+        const iniciais = palavras.length > 1 ? (palavras[0][0] + palavras[1][0]).toUpperCase() : empresa.slice(0, 2).toUpperCase();
+
         const dados = {
-            empresa: document.getElementById('cEmpresa').value,
-            iniciais: document.getElementById('cIniciais').value.toUpperCase(),
+            empresa,
+            iniciais,
             contato: document.getElementById('cContato').value,
             telefone: document.getElementById('cTel').value,
-            status: document.getElementById('cStatus').value,
-            rotasRealizadas: Number(document.getElementById('cRotas').value || 0),
-            obs: document.getElementById('cObs').value
+            rotasRealizadas: Number(document.getElementById('cRotas').value),
+            status: novoStatus
         };
+
         if (id) Object.assign(c, dados);
         else state.clientes.push({ id: Date.now(), ...dados });
 
@@ -1279,7 +1396,7 @@ function abrirModalCliente(id = null) {
     });
 }
 
-// Modal: Rotas (Ocultando clientes inativos, veículos indisponíveis e bloqueando CNH irregular)
+// Modal: Rotas (Filtra apenas veículos da Frota Atual que estejam Disponíveis e sem conflito de horário)
 function abrirModalRota(id = null) {
     const clientePadrao = state.clientes.find(c => c.status === 'Ativo') || state.clientes[0];
 
@@ -1287,20 +1404,25 @@ function abrirModalRota(id = null) {
         clienteId: clientePadrao ? clientePadrao.id : 1,
         veiculoId: '',
         motoristaId: '',
-        data: typeof obterDataHojeISO === 'function' ? obterDataHojeISO() : '2026-09-28',
+        data: typeof obterDataHojeISO === 'function' ? obterDataHojeISO() : '2026-11-11',
         periodo: 'Manhã',
         horaInicio: '08:00',
         horaFim: '10:00',
-        status: 'Em andamento'
+        status: 'Agendada'
     };
 
-    const veiculosOcupadosIds = state.rotas
-        .filter(rota => rota.id !== id && rota.status === 'Em andamento')
+    // Veículos ocupados em OUTRAS rotas não finalizadas
+    const veiculosOcupadosEmOutrasRotas = state.rotas
+        .filter(rota => rota.id !== id && rota.status !== 'Finalizada')
         .map(rota => Number(rota.veiculoId));
 
-    const veiculosElegiveis = state.veiculos.filter(v =>
-        (v.status === 'Disponível' && !veiculosOcupadosIds.includes(v.id)) || Number(v.id) === Number(r.veiculoId)
-    );
+    // Exibe apenas veículos da Frota Atual (Disponíveis e não ocupados em outra rota, ou o próprio veículo já vinculado a esta rota)
+    const veiculosElegiveis = state.veiculos.filter(v => {
+        if (v.status === 'Vendido' || v.status === 'Inativo' || v.status === 'Em manutenção') return false;
+        const ehOVeiculoDestaRota = id && Number(v.id) === Number(r.veiculoId);
+        const estaLivre = !veiculosOcupadosEmOutrasRotas.includes(v.id);
+        return ehOVeiculoDestaRota || (v.status === 'Disponível' && estaLivre);
+    });
 
     abrirModal(id ? 'Editar Rota' : 'Nova Rota Operacional', `
         <form id="formRota">
@@ -1314,9 +1436,9 @@ function abrirModalRota(id = null) {
                 </select>
             </div>
             <div class="form-group">
-                <label>Veículo Disponível (Sem conflito de rota)</label>
+                <label>Veículo da Frota (Disponíveis e sem conflito)</label>
                 <select id="rVeiculo" required>
-                    <option value="">Selecione um veículo disponível...</option>
+                    <option value="">Selecione um veículo disponível na frota...</option>
                     ${veiculosElegiveis.map(v => `<option value="${v.id}" ${Number(r.veiculoId) === v.id ? 'selected' : ''}>${v.placa} - ${v.modelo}</option>`).join('')}
                 </select>
             </div>
@@ -1333,7 +1455,7 @@ function abrirModalRota(id = null) {
             </div>
             <div class="grid-3" style="gap:10px;">
                 <div class="form-group">
-                    <label>Data</label>
+                    <label>Data Início</label>
                     <input type="date" id="rData" value="${r.data}" required>
                 </div>
                 <div class="form-group">
@@ -1345,11 +1467,11 @@ function abrirModalRota(id = null) {
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Status</label>
+                    <label>Status do Contrato</label>
                     <select id="rStatus">
-                        <option value="Agendada" ${r.status === 'Agendada' ? 'selected' : ''}>Agendada</option>
+                        <option value="Agendada" ${r.status === 'Agendada' ? 'selected' : ''}>Ativa (Ciclo automático)</option>
                         <option value="Em andamento" ${r.status === 'Em andamento' ? 'selected' : ''}>Em andamento</option>
-                        <option value="Finalizada" ${r.status === 'Finalizada' ? 'selected' : ''}>Finalizada</option>
+                        <option value="Finalizada" ${r.status === 'Finalizada' ? 'selected' : ''}>Finalizada (Encerrar rota)</option>
                     </select>
                 </div>
             </div>
@@ -1381,7 +1503,7 @@ function abrirModalRota(id = null) {
         const mot = state.motoristas.find(m => m.id === motoristaId);
 
         if (!veiculoId) {
-            errEl.textContent = 'Selecione um veículo disponível para a rota.';
+            errEl.textContent = 'Selecione um veículo disponível da sua frota atual.';
             errEl.style.display = 'block';
             return;
         }
@@ -1393,21 +1515,41 @@ function abrirModalRota(id = null) {
             return;
         }
 
+        const horaInicio = document.getElementById('rInicio').value;
+        const horaFim = document.getElementById('rFim').value;
+        if (horaFim <= horaInicio) {
+            errEl.textContent = 'O horário final deve ser maior que o horário inicial.';
+            errEl.style.display = 'block';
+            return;
+        }
+
+        // Conflito de motorista no mesmo horário em outra rota ativa
+        const conflitoMotorista = state.rotas.find(outra => {
+            if (outra.id === id || outra.status === 'Finalizada') return false;
+            if (Number(outra.motoristaId) !== motoristaId) return false;
+            return (horaInicio < outra.horaFim && horaFim > outra.horaInicio);
+        });
+
+        if (conflitoMotorista) {
+            errEl.textContent = `Conflito de horário: O motorista ${mot.nome} já está alocado em outra rota entre ${conflitoMotorista.horaInicio} e ${conflitoMotorista.horaFim}.`;
+            errEl.style.display = 'block';
+            return;
+        }
+
         const dados = {
             clienteId: Number(document.getElementById('rCliente').value),
             veiculoId,
             motoristaId,
             data: document.getElementById('rData').value,
             periodo: document.getElementById('rPeriodo').value,
-            horaInicio: document.getElementById('rInicio').value,
-            horaFim: document.getElementById('rFim').value,
+            horaInicio,
+            horaFim,
             status: document.getElementById('rStatus').value
         };
 
         if (id) Object.assign(r, dados);
         else state.rotas.unshift({ id: Date.now(), ...dados });
 
-        // Se o proprietário não marcou como Finalizada, já ajusta o ciclo pelo horário atual na hora!
         await verificarStatusRotasAutomatico();
         await salvarEstado();
         fecharModal();
@@ -1415,50 +1557,52 @@ function abrirModalRota(id = null) {
     });
 }
 
-// Modal: Registrar ou Editar Serviço de Manutenção (Ocultando veículos vendidos)
+// Modal: Registrar ou Editar Serviço de Manutenção (Com Status Automático por Data e Sincronização com Frota)
 function abrirModalManutencao(id = null) {
-    const servicoExistente = id ? state.manutencoes.find(item => item.id === id) : null;
-    const veiculoPadrao = state.veiculos.find(v => v.status !== 'Vendido') || state.veiculos[0];
+    const editando = id !== null;
+    const hojeISO = typeof obterDataHojeISO === 'function' ? obterDataHojeISO() : '2026-11-11';
 
-    const m = servicoExistente || {
-        veiculoId: veiculoPadrao ? veiculoPadrao.id : 1,
-        data: '2026-10-16',
-        tipo: 'Sistema de freios',
-        status: 'Agendado',
+    const m = state.manutencoes.find(item => item.id === id) || {
+        placa: state.veiculos.find(v => v.status !== 'Vendido')?.placa || state.veiculos[0].placa,
+        data: hojeISO,
+        tipo: 'Preventiva',
         oficina: '',
         custo: '',
-        obs: ''
+        obs: '',
+        status: 'Em andamento'
     };
 
-    abrirModal(servicoExistente ? `Editar Serviço #${m.codigo} (${m.placa})` : 'Registrar Serviço de Manutenção', `
+    // Filtra apenas veículos da Frota Atual (não vendidos) para o select
+    const veiculosFrotaAtual = state.veiculos.filter(v => v.status !== 'Vendido' || v.placa === m.placa);
+
+    abrirModal(editando ? `Editar Serviço #${m.codigo || ''} (${m.placa})` : 'Registrar Serviço de Manutenção', `
         <form id="formManutencao">
             <div class="grid-2">
                 <div class="form-group">
                     <label>Veículo</label>
-                    <select id="manVeiculo" required>
-                        ${state.veiculos
-                            .filter(v => v.status !== 'Vendido' || Number(m.veiculoId) === v.id)
-                            .map(v => `<option value="${v.id}" ${Number(m.veiculoId) === v.id ? 'selected' : ''}>${v.placa} - ${v.modelo}</option>`)
-                            .join('')}
+                    <select id="manPlaca" required>
+                        ${veiculosFrotaAtual.map(v => `<option value="${v.placa}" ${v.placa === m.placa ? 'selected' : ''}>${v.placa} - ${v.modelo}</option>`).join('')}
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Data</label>
+                    <label>Data do Serviço</label>
                     <input type="date" id="manData" value="${m.data}" required>
                 </div>
             </div>
             <div class="grid-2">
                 <div class="form-group">
                     <label>Tipo de Serviço</label>
-                    <select id="manTipo" required>
-                        ${['Troca de óleo', 'Sistema de freios', 'Pneus', 'Preventiva', 'Motor / marcha'].map(t =>
-                            `<option value="${t}" ${m.tipo === t ? 'selected' : ''}>${t}</option>`
-                        ).join('')}
+                    <select id="manTipo">
+                        <option value="Troca de óleo" ${m.tipo === 'Troca de óleo' ? 'selected' : ''}>Troca de óleo</option>
+                        <option value="Sistema de freios" ${m.tipo === 'Sistema de freios' ? 'selected' : ''}>Sistema de freios</option>
+                        <option value="Pneus" ${m.tipo === 'Pneus' ? 'selected' : ''}>Pneus</option>
+                        <option value="Preventiva" ${m.tipo === 'Preventiva' ? 'selected' : ''}>Preventiva</option>
+                        <option value="Motor / marcha" ${m.tipo === 'Motor / marcha' ? 'selected' : ''}>Motor / marcha</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label>Status da Manutenção</label>
-                    <select id="manStatus" required>
+                    <select id="manStatus">
                         <option value="Agendado" ${m.status === 'Agendado' ? 'selected' : ''}>Agendado</option>
                         <option value="Em andamento" ${m.status === 'Em andamento' ? 'selected' : ''}>Em andamento</option>
                         <option value="Concluído" ${m.status === 'Concluído' ? 'selected' : ''}>Concluído</option>
@@ -1479,40 +1623,83 @@ function abrirModalManutencao(id = null) {
                 <label>Observação</label>
                 <input type="text" id="manObs" value="${m.obs || ''}" placeholder="Detalhes do serviço realizado...">
             </div>
+            <p class="error-msg" id="manutBlockError" style="display:none;"></p>
             <div class="modal-footer">
                 <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
-                <button type="submit" class="btn-primary">${servicoExistente ? 'Salvar alterações' : 'Registrar serviço'}</button>
+                <button type="submit" class="btn-primary">${editando ? 'Salvar alterações' : 'Registrar serviço'}</button>
             </div>
         </form>
     `);
 
+    const inputData = document.getElementById('manData');
+    const selectStatus = document.getElementById('manStatus');
+
+    // Quando o usuário muda a data no calendário:
+    // - Se colocar data futura (ex: amanhã 12/11/2026), muda automaticamente para "Agendado"
+    // - Se colocar a data de hoje e estava "Agendado", muda automaticamente para "Em andamento"
+    inputData.addEventListener('change', () => {
+        const dataEscolhida = inputData.value;
+        if (!dataEscolhida) return;
+
+        if (dataEscolhida > hojeISO) {
+            selectStatus.value = 'Agendado';
+        } else if (dataEscolhida <= hojeISO && selectStatus.value === 'Agendado') {
+            selectStatus.value = 'Em andamento';
+        }
+    });
+
     document.getElementById('formManutencao').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const vId = Number(document.getElementById('manVeiculo').value);
-        const veiculo = state.veiculos.find(v => v.id === vId);
+        const errEl = document.getElementById('manutBlockError');
+        errEl.style.display = 'none';
 
-        const dadosAtualizados = {
-            veiculoId: vId,
-            placa: veiculo ? veiculo.placa : 'VEÍCULO',
-            data: document.getElementById('manData').value,
+        const placa = document.getElementById('manPlaca').value;
+        const dataEscolhida = inputData.value;
+        let status = selectStatus.value;
+
+        // Garante a regra: se a data é futura e o usuário não marcou como Concluído, fica Agendado
+        if (dataEscolhida > hojeISO && status !== 'Concluído') {
+            status = 'Agendado';
+        } else if (dataEscolhida <= hojeISO && status === 'Agendado') {
+            status = 'Em andamento';
+        }
+
+        const veiculo = state.veiculos.find(v => v.placa === placa);
+
+        // Trava: se a manutenção vai entrar "Em andamento" hoje, verifica se o veículo está rodando em uma rota "Em andamento" agora
+        if (status === 'Em andamento' && veiculo) {
+            const rotaRodandoAgora = state.rotas.find(r => Number(r.veiculoId) === veiculo.id && r.status === 'Em andamento');
+            if (rotaRodandoAgora) {
+                const cli = state.clientes.find(c => c.id === Number(rotaRodandoAgora.clienteId));
+                errEl.textContent = `Conflito operacional: O veículo ${placa} está realizando uma viagem "Em andamento" agora (${cli ? cli.empresa : 'Rota ativa'}). Aguarde o fim da viagem ou troque o veículo da rota antes de iniciar a manutenção.`;
+                errEl.style.display = 'block';
+                return;
+            }
+        }
+
+        const dados = {
+            placa,
+            data: dataEscolhida,
             tipo: document.getElementById('manTipo').value,
-            oficina: document.getElementById('manOficina').value,
-            obs: document.getElementById('manObs').value,
-            custo: Number(document.getElementById('manCusto').value || 0),
-            status: document.getElementById('manStatus').value
+            oficina: document.getElementById('manOficina').value.trim(),
+            custo: Number(document.getElementById('manCusto').value),
+            obs: document.getElementById('manObs').value.trim(),
+            status
         };
 
-        if (servicoExistente) {
-            Object.assign(servicoExistente, dadosAtualizados);
+        if (editando) {
+            Object.assign(m, dados);
         } else {
-            const maiorCodigo = state.manutencoes.reduce((max, item) => Math.max(max, Number(item.codigo || 0)), 0);
+            const maiorCodigo = state.manutencoes.reduce((max, item) => Math.max(max, item.codigo || 0), 0);
             state.manutencoes.unshift({
                 id: Date.now(),
                 codigo: maiorCodigo + 1,
-                ...dadosAtualizados
+                ...dados
             });
         }
 
+        // Sincroniza imediatamente o status da manutenção e do veículo na Frota
+        await verificarStatusRotasAutomatico();
         await salvarEstado();
         fecharModal();
         renderizarTudo();

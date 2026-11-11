@@ -122,8 +122,8 @@
       "placa": "BXD-7A14",
       "modelo": "Ford Transit 410",
       "ano": 2021,
-      "capacidade": "14 passageiros",
-      "status": "Em rota",
+      "capacidade": 10,
+      "status": "Disponível",
       "documentos": {
         "ipva": {
           "vencimento": "2026-12-28",
@@ -149,8 +149,13 @@
       "km": {
         "atual": 82100,
         "proxTrocaOleo": 90000,
-        "dataConferencia": "2026-09-28",
-        "obs": ""
+        "ultimaAtualizacao": "2026-11-11"
+      },
+      "docs": {
+        "crlv": "",
+        "seguro": "",
+        "tacografo": "",
+        "revisao": ""
       }
     },
     {
@@ -159,7 +164,7 @@
       "modelo": "Volkswagen Crafter",
       "ano": 2020,
       "capacidade": "16 passageiros",
-      "status": "Inativo",
+      "status": "Disponível",
       "documentos": {
         "ipva": {
           "vencimento": "",
@@ -383,14 +388,16 @@
       "nome": "Márcia Vieira Souza",
       "cnh": "05478321908",
       "categoria": "D",
-      "validade": "2026-11-14"
+      "validade": "2027-01-15",
+      "telefone": "undefined"
     },
     {
       "id": 3,
       "nome": "João Marcos Reis",
       "cnh": "07321654892",
       "categoria": "E",
-      "validade": "2026-10-01"
+      "validade": "2027-01-21",
+      "telefone": "undefined"
     },
     {
       "id": 4,
@@ -485,35 +492,35 @@
     {
       "id": 2,
       "clienteId": 2,
-      "veiculoId": 3,
+      "veiculoId": 6,
       "motoristaId": 1,
-      "data": "2026-11-10",
+      "data": "2026-11-12",
       "periodo": "Manhã",
       "horaInicio": "10:30",
-      "horaFim": "12:30",
-      "status": "Em andamento"
+      "horaFim": "12:00",
+      "status": "Agendada"
     },
     {
       "id": 3,
       "clienteId": 3,
       "veiculoId": 4,
       "motoristaId": 1,
-      "data": "2026-11-11",
+      "data": "2026-11-12",
       "periodo": "Tarde",
       "horaInicio": "11:32",
-      "horaFim": "12:30",
-      "status": "Em andamento"
+      "horaFim": "12:00",
+      "status": "Agendada"
     },
     {
       "id": 4,
       "clienteId": 4,
       "veiculoId": 5,
       "motoristaId": 4,
-      "data": "2026-11-11",
+      "data": "2026-11-12",
       "periodo": "Manhã",
       "horaInicio": "11:23",
       "horaFim": "12:00",
-      "status": "Em andamento"
+      "status": "Agendada"
     }
   ],
   "manutencoes": [
@@ -522,12 +529,12 @@
       "codigo": 6,
       "veiculoId": 7,
       "placa": "MNO-6E41",
-      "data": "2026-10-16",
+      "data": "2026-11-18",
       "tipo": "Motor / marcha",
       "oficina": "OFICINA DO VITAO",
       "obs": "",
       "custo": 5000,
-      "status": "Em andamento"
+      "status": "Agendado"
     },
     {
       "id": 1794105059426,
