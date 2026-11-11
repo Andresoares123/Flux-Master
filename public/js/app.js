@@ -33,6 +33,42 @@ function atualizarRelogioCabecalho() {
     if (elSaudacao) elSaudacao.textContent = saudacao;
 }
 
+// Automação de Ciclo Diário: Alterna entre "Agendada" e "Em andamento" conforme o horário do PC.
+// Só fica "Finalizada" quando o proprietário encerrar manualmente o contrato da rota.
+async function verificarStatusRotasAutomatico() {
+    if (!state || !state.rotas || state.rotas.length === 0) return;
+
+    const agora = new Date();
+    const minutosAgora = agora.getHours() * 60 + agora.getMinutes();
+
+    let houveMudanca = false;
+
+    state.rotas.forEach(r => {
+        // Se o proprietário já encerrou o contrato (Finalizada), não entra no ciclo automático
+        if (r.status === 'Finalizada') return;
+        if (!r.horaInicio || !r.horaFim) return;
+
+        const [hIni, mIni] = r.horaInicio.split(':').map(Number);
+        const [hFim, mFim] = r.horaFim.split(':').map(Number);
+        const minInicio = hIni * 60 + mIni;
+        const minFim = hFim * 60 + mFim;
+
+        // Verifica se o horário atual do computador está dentro da janela da rota
+        const estaNoHorario = minutosAgora >= minInicio && minutosAgora < minFim;
+        const novoStatus = estaNoHorario ? 'Em andamento' : 'Agendada';
+
+        if (r.status !== novoStatus) {
+            r.status = novoStatus;
+            houveMudanca = true;
+        }
+    });
+
+    if (houveMudanca) {
+        await salvarEstado();
+        renderizarTudo();
+    }
+}
+
 // Estado Global
 let state = {
     veiculos: [],
@@ -42,7 +78,7 @@ let state = {
     manutencoes: []
 };
 
-// Dados Iniciais Completos (10 veículos como nos prints do Figma)
+// Dados Iniciais Completos 
 const fallbackData = {
     veiculos: [
         { id: 1, placa: 'QWE-4D21', modelo: 'Mercedes Sprinter 417', ano: 2023, capacidade: '15 passageiros', status: 'Disponível',
@@ -112,20 +148,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const userName = localStorage.getItem('lm_user') || 'Lucas Mendes';
     document.getElementById('userNameDisplay').textContent = userName;
-    
+
+    atualizarRelogioCabecalho();
     configurarTemas();
     configurarNavegacao();
     configurarFiltros();
 
     await carregarDados();
+    await verificarStatusRotasAutomatico();
     renderizarTudo();
-});
-    //CLOCK
-    const userName = localStorage.getItem('lm_user') || 'Lucas Mendes';
-    document.getElementById('userNameDisplay').textContent = userName;
 
-    atualizarRelogioCabecalho();
-    setInterval(atualizarRelogioCabecalho, 60000); // Atualiza a cada 1 minuto
+    // Verifica o relógio e atualiza status das rotas automaticamente a cada 30 segundos
+    setInterval(async () => {
+        atualizarRelogioCabecalho();
+        await verificarStatusRotasAutomatico();
+    }, 30000);
+});
 
 async function carregarDados() {
     try {
@@ -387,8 +425,9 @@ function formatarValorCurto(val) {
     return `R$ ${val.toLocaleString('pt-BR')}`;
 }
 
-// 2. Dashboard (Calculado sobre veículos ativos e meses reais)
+// 2. Dashboard (Sincronizado 100% com a aba Rotas e com faixas de horário elásticas)
 function renderizarDashboard() {
+    // --- A) Frota ---
     const frotaEmpresa = state.veiculos.filter(v => v.status !== 'Vendido');
     const totalV = frotaEmpresa.length;
     const manutV = frotaEmpresa.filter(v => v.status === 'Em manutenção').length;
@@ -403,7 +442,110 @@ function renderizarDashboard() {
     document.getElementById('dashLegDisp').textContent = dispV;
     document.getElementById('dashLegManut').textContent = manutV;
 
-    // Custos dos últimos 4 meses dinâmicos
+    // --- B) KPI Rotas Hoje (Idêntico à aba Rotas: soma Em andamento + Agendadas) ---
+    const rotasAtivas = state.rotas.filter(r => r.status !== 'Finalizada');
+    const qtdAndamento = rotasAtivas.filter(r => r.status === 'Em andamento').length;
+    const qtdAgendadas = rotasAtivas.filter(r => r.status === 'Agendada').length;
+    const totalHoje = rotasAtivas.length; // Bate exatamente com o "Rotas hoje: 3" da aba Rotas!
+
+    const elRotasHoje = document.getElementById('dashRotasHoje');
+    const elRotasSub = document.getElementById('dashRotasSub');
+    if (elRotasHoje) elRotasHoje.textContent = `${totalHoje} ${totalHoje === 1 ? 'rota' : 'rotas'}`;
+    if (elRotasSub) elRotasSub.textContent = `${qtdAndamento} em andamento · ${qtdAgendadas} agendada${qtdAgendadas !== 1 ? 's' : ''}`;
+
+    // --- C) Gráfico de Distribuição das Rotas (Refinado: Fusão de faixas de pico e foco em Em andamento) ---
+    const faixas = [
+        { idx: 0, iniPadrao: 6, fimPadrao: 9, minHora: null, maxHora: null, qtd: 0, qtdAndamento: 0 },
+        { idx: 1, iniPadrao: 9, fimPadrao: 12, minHora: null, maxHora: null, qtd: 0, qtdAndamento: 0 },
+        { idx: 2, iniPadrao: 12, fimPadrao: 15, minHora: null, maxHora: null, qtd: 0, qtdAndamento: 0 },
+        { idx: 3, iniPadrao: 15, fimPadrao: 18, minHora: null, maxHora: null, qtd: 0, qtdAndamento: 0 },
+        { idx: 4, iniPadrao: 18, fimPadrao: 21, minHora: null, maxHora: null, qtd: 0, qtdAndamento: 0 }
+    ];
+
+    rotasAtivas.forEach(r => {
+        if (!r.horaInicio) return;
+        const hora = parseInt(r.horaInicio.split(':')[0], 10);
+        if (isNaN(hora)) return;
+
+        let idx = 0;
+        if (hora < 9) idx = 0;
+        else if (hora < 12) idx = 1;
+        else if (hora < 15) idx = 2;
+        else if (hora < 18) idx = 3;
+        else idx = 4;
+
+        faixas[idx].qtd++;
+        if (r.status === 'Em andamento') {
+            faixas[idx].qtdAndamento++;
+        }
+        if (faixas[idx].minHora === null || hora < faixas[idx].minHora) faixas[idx].minHora = hora;
+        if (faixas[idx].maxHora === null || hora > faixas[idx].maxHora) faixas[idx].maxHora = hora;
+    });
+
+    const barsContainer = document.getElementById('dashRouteBars');
+    const peakEl = document.getElementById('dashRoutePeak');
+    const activeCountEl = document.getElementById('dashRouteActiveCount');
+
+    if (activeCountEl) {
+        activeCountEl.textContent = `• ${qtdAndamento} em andamento`;
+    }
+
+    if (barsContainer) {
+        const maiorQtdTotal = Math.max(...faixas.map(f => f.qtd), 1);
+        const maiorQtdAndamento = Math.max(...faixas.map(f => f.qtdAndamento), 0);
+
+        // Prepara os limites reais de cada faixa (ex: 05-09 se houver rota às 05h)
+        faixas.forEach(f => {
+            f.iniReal = (f.minHora !== null && f.minHora < f.iniPadrao) ? f.minHora : f.iniPadrao;
+            f.fimReal = (f.maxHora !== null && f.maxHora > f.fimPadrao) ? f.maxHora : f.fimPadrao;
+            f.iniStr = String(f.iniReal).padStart(2, '0');
+            f.fimStr = String(f.fimReal).padStart(2, '0');
+            f.labelDinamico = `${f.iniStr}–${f.fimStr}`;
+        });
+
+        // Define quais faixas representam o Pico (prioriza as rotas "Em andamento" se houver alguma)
+        const criterioPico = maiorQtdAndamento > 0
+            ? (f => f.qtdAndamento === maiorQtdAndamento)
+            : (f => f.qtd > 0 && f.qtd === maiorQtdTotal);
+
+        const faixasDePico = faixas.filter(criterioPico);
+
+        barsContainer.innerHTML = faixas.map(f => {
+            const alturaPx = f.qtd > 0 ? Math.max(Math.round((f.qtd / maiorQtdTotal) * 85), 24) : 6;
+            const isPeak = criterioPico(f);
+            const estiloZero = f.qtd === 0 ? 'background-color: var(--border); opacity: 0.6;' : '';
+
+            return `
+                <div class="bar-col">
+                    <span class="bar-val" style="${f.qtd === 0 ? 'color: var(--text-muted); font-weight: 500;' : ''}">${f.qtd}</span>
+                    <div class="bar-fill ${isPeak ? 'highlight' : ''}" style="height: ${alturaPx}px; ${estiloZero}"></div>
+                    <span class="bar-label">${f.labelDinamico}</span>
+                </div>
+            `;
+        }).join('');
+
+        if (peakEl) {
+            if (faixasDePico.length === 0) {
+                peakEl.textContent = 'Sem rotas ativas programadas';
+            } else if (faixasDePico.length === 1) {
+                // Apenas 1 faixa de pico (ex: "Pico entre 09h e 12h")
+                peakEl.textContent = `Pico entre ${faixasDePico[0].iniStr}h e ${faixasDePico[0].fimStr}h`;
+            } else {
+                // Verifica se as faixas empatadas são vizinhas/contínuas (ex: 09-12 e 12-15 -> junta em "09h e 15h")
+                const primeira = faixasDePico[0];
+                const ultima = faixasDePico[faixasDePico.length - 1];
+                const saoContinuas = (ultima.idx - primeira.idx) === (faixasDePico.length - 1);
+
+                if (saoContinuas) {
+                    peakEl.textContent = `Pico entre ${primeira.iniStr}h e ${ultima.fimStr}h`;
+                } else {
+                    // Se forem separadas (ex: manhã e noite), mostra o intervalo abrangente das rotas de pico
+                    peakEl.textContent = `Pico entre ${primeira.iniStr}h e ${ultima.fimStr}h`;
+                }
+            }
+        }
+    }
+    // --- D) Custos dos últimos 4 meses dinâmicos ---
     const ultimos4 = calcularCustosUltimosMeses(4);
     const maiorValor = Math.max(...ultimos4.map(m => m.valor), 1);
 
@@ -1265,6 +1407,8 @@ function abrirModalRota(id = null) {
         if (id) Object.assign(r, dados);
         else state.rotas.unshift({ id: Date.now(), ...dados });
 
+        // Se o proprietário não marcou como Finalizada, já ajusta o ciclo pelo horário atual na hora!
+        await verificarStatusRotasAutomatico();
         await salvarEstado();
         fecharModal();
         renderizarTudo();

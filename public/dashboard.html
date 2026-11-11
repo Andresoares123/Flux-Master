@@ -173,36 +173,10 @@
                         </div>
                         <button class="ver-link" onclick="navegarPara('rotas')">Ver ›</button>
                     </div>
-                    <div class="bars-container">
-                        <div class="bar-col">
-                            <span class="bar-val">2</span>
-                            <div class="bar-fill" style="height: 42px;"></div>
-                            <span class="bar-label">06–09</span>
-                        </div>
-                        <div class="bar-col">
-                            <span class="bar-val">4</span>
-                            <div class="bar-fill highlight" style="height: 85px;"></div>
-                            <span class="bar-label">09–12</span>
-                        </div>
-                        <div class="bar-col">
-                            <span class="bar-val">3</span>
-                            <div class="bar-fill" style="height: 64px;"></div>
-                            <span class="bar-label">12–15</span>
-                        </div>
-                        <div class="bar-col">
-                            <span class="bar-val">2</span>
-                            <div class="bar-fill" style="height: 42px;"></div>
-                            <span class="bar-label">15–18</span>
-                        </div>
-                        <div class="bar-col">
-                            <span class="bar-val">1</span>
-                            <div class="bar-fill" style="height: 22px;"></div>
-                            <span class="bar-label">18–21</span>
-                        </div>
-                    </div>
+                    <div class="bars-container" id="dashRouteBars"></div>
                     <div class="chart-footer-note blue">
-                        <span>Pico entre 09h e 12h</span>
-                        <strong>• 4 em andamento</strong>
+                        <span id="dashRoutePeak">Sem rotas ativas no momento</span>
+                        <strong id="dashRouteActiveCount">• 0 em andamento</strong>
                     </div>
                 </div>
 
