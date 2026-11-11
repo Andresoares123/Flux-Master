@@ -487,11 +487,11 @@
       "clienteId": 2,
       "veiculoId": 3,
       "motoristaId": 1,
-      "data": "2026-09-28",
+      "data": "2026-11-10",
       "periodo": "Manhã",
       "horaInicio": "10:30",
       "horaFim": "12:30",
-      "status": "Finalizada"
+      "status": "Em andamento"
     },
     {
       "id": 3,
@@ -513,7 +513,7 @@
       "periodo": "Noite",
       "horaInicio": "18:00",
       "horaFim": "20:00",
-      "status": "Finalizada"
+      "status": "Em andamento"
     }
   ],
   "manutencoes": [

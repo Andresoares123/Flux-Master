@@ -586,23 +586,30 @@ function renderizarClientes() {
     `).join('');
 }
 
-// 6. Rotas (Oculta Finalizadas por padrão)
+// 6. Rotas (Suporte completo a Agendada, Em andamento e Finalizada)
 function renderizarRotas() {
-    const total = state.rotas.length;
+    const rotasNaoFinalizadas = state.rotas.filter(r => r.status !== 'Finalizada');
     const andamento = state.rotas.filter(r => r.status === 'Em andamento').length;
 
-    document.getElementById('rotasTotalCount').textContent = total;
+    // Mostra o total de rotas ativas do dia (Em andamento + Agendadas)
+    document.getElementById('rotasTotalCount').textContent = rotasNaoFinalizadas.length;
     document.getElementById('rotasAndamentoCount').textContent = andamento;
 
     const busca = (document.getElementById('searchRota')?.value || '').toLowerCase();
-    const filtroStatus = document.getElementById('filterStatusRota')?.value || 'Em andamento';
+    const filtroStatus = document.getElementById('filterStatusRota')?.value || 'Ativas';
 
     const rotasFiltradas = state.rotas.filter(r => {
         const cli = state.clientes.find(c => c.id === Number(r.clienteId)) || { empresa: '' };
         const vei = state.veiculos.find(v => v.id === Number(r.veiculoId)) || { modelo: '', placa: '' };
         const mot = state.motoristas.find(m => m.id === Number(r.motoristaId)) || { nome: '' };
 
-        const matchStatus = filtroStatus === 'Todos' ? true : r.status === filtroStatus;
+        let matchStatus = true;
+        if (filtroStatus === 'Ativas') {
+            matchStatus = r.status !== 'Finalizada';
+        } else if (filtroStatus !== 'Todos') {
+            matchStatus = r.status === filtroStatus;
+        }
+
         const matchBusca =
             cli.empresa.toLowerCase().includes(busca) ||
             vei.placa.toLowerCase().includes(busca) ||
@@ -623,8 +630,13 @@ function renderizarRotas() {
         const vei = state.veiculos.find(v => v.id === Number(r.veiculoId)) || { modelo: 'Veículo', placa: '' };
         const mot = state.motoristas.find(m => m.id === Number(r.motoristaId)) || { nome: 'Motorista' };
 
-        const badgeClass = r.status === 'Em andamento' ? 'blue' : 'gray';
-        const statusLabel = r.status === 'Finalizada' ? 'Finalizado' : r.status;
+        const mapCorStatus = {
+            'Em andamento': 'blue',
+            'Agendada': 'orange',
+            'Finalizada': 'gray'
+        };
+        const badgeClass = mapCorStatus[r.status] || 'gray';
+        const statusLabel = r.status === 'Finalizada' ? 'Finalizado' : (r.status === 'Agendada' ? 'Agendado' : r.status);
 
         return `
             <div class="route-item">
@@ -654,7 +666,6 @@ function renderizarRotas() {
     }).join('');
 }
 
-// 7. Manutenções e Relatórios (Com Código Fixo, Filtros e Edição de Status ao clicar)
 // 7. Manutenções e Relatórios (Com Gráficos de 3 Meses e Categorias 100% Dinâmicos)
 function renderizarManutencoesERelatorios() {
     state.manutencoes.forEach((m, index) => {
@@ -1194,6 +1205,7 @@ function abrirModalRota(id = null) {
                 <div class="form-group">
                     <label>Status</label>
                     <select id="rStatus">
+                        <option value="Agendada" ${r.status === 'Agendada' ? 'selected' : ''}>Agendada</option>
                         <option value="Em andamento" ${r.status === 'Em andamento' ? 'selected' : ''}>Em andamento</option>
                         <option value="Finalizada" ${r.status === 'Finalizada' ? 'selected' : ''}>Finalizada</option>
                     </select>
