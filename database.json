@@ -189,7 +189,7 @@
       "modelo": "Ford Transit 410",
       "ano": 2021,
       "capacidade": "12 passageiros",
-      "status": "Disponível",
+      "status": "Em manutenção",
       "documentos": {
         "ipva": {
           "vencimento": "2026-12-28",
@@ -594,6 +594,41 @@
           "obs": ""
         }
       }
+    },
+    {
+      "id": 1794525011042,
+      "placa": "ABC-D123",
+      "modelo": "MERCEDES SPLINTER",
+      "ano": 2020,
+      "capacidade": "20 passageiros",
+      "status": "Disponível",
+      "km": {
+        "atual": 0,
+        "proxTrocaOleo": 10000,
+        "ultimaAtualizacao": "2026-11-12"
+      },
+      "registros": {
+        "ipva": {
+          "vencimento": "2027-05-15",
+          "valor": "",
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        }
+      }
     }
   ],
   "motoristas": [
@@ -641,6 +676,15 @@
       "validade": "2027-11-05",
       "telefone": "3899999999",
       "status": "Inativo"
+    },
+    {
+      "id": 1794526076480,
+      "nome": "João Costa",
+      "status": "Inativo",
+      "telefone": "38998686715",
+      "categoria": "D",
+      "cnh": "9892189829122",
+      "validade": "2028-05-10"
     }
   ],
   "clientes": [
@@ -753,6 +797,17 @@
     }
   ],
   "manutencoes": [
+    {
+      "id": 1794524534673,
+      "codigo": 9,
+      "placa": "BXD-7A14",
+      "data": "2026-11-12",
+      "tipo": "Preventiva",
+      "oficina": "OFICINA DO THUNG",
+      "custo": 1250,
+      "obs": "",
+      "status": "Em andamento"
+    },
     {
       "id": 1794506554365,
       "codigo": 8,

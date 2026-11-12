@@ -620,18 +620,24 @@ function formatarValorCurto(val) {
     return `R$ ${val.toLocaleString('pt-BR')}`;
 }
 
-// 2. Dashboard
+// 2. Dashboard (Sincronizado com veículos disponíveis, em manutenção e inativos)
 function renderizarDashboard() {
     const frotaEmpresa = state.veiculos.filter(v => v.status !== 'Vendido');
     const totalV = frotaEmpresa.length;
     const manutV = frotaEmpresa.filter(v => v.status === 'Em manutenção').length;
-    const dispV = totalV - manutV;
+    const inativosV = frotaEmpresa.filter(v => v.status === 'Inativo').length;
+    const dispV = frotaEmpresa.filter(v => v.status === 'Disponível' || v.status === 'Em rota').length;
     const pct = totalV > 0 ? Math.round((dispV / totalV) * 100) : 0;
 
     const setEl = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
 
     setEl('dashVeiculosDisp', `${dispV} de ${totalV}`);
-    setEl('dashVeiculosManut', `${manutV} veículos em manutenção`);
+    setEl(
+        'dashVeiculosManut',
+        inativosV > 0
+            ? `${manutV} em manutenção · ${inativosV} inativo${inativosV !== 1 ? 's' : ''}`
+            : `${manutV} veículo${manutV !== 1 ? 's' : ''} em manutenção`
+    );
     setEl('dashSitFrota', `Situação atual dos ${totalV} veículos`);
     setEl('dashDonutPct', `${pct}%`);
     const ringEl = document.getElementById('dashDonutRing');
@@ -751,18 +757,38 @@ function renderizarDashboard() {
     setEl('dashFooterCusto', gastoFormatado);
 }
 
-// 3. Frota de Veículos (Com design refinado na coluna REGISTROS e botão + Adicionar)
+// 3. Frota de Veículos (Com identificação automática nos 3 cards do topo e coluna REGISTROS refinada)
 function renderizarFrota() {
     const frotaAtiva = state.veiculos.filter(v => v.status !== 'Vendido');
     const manut = frotaAtiva.filter(v => v.status === 'Em manutenção').length;
     const disp = frotaAtiva.filter(v => v.status === 'Disponível' || v.status === 'Em rota').length;
 
+    // Atualiza por ID (se existir)
     const elTotal = document.getElementById('frotaTotalCount');
     const elDisp = document.getElementById('frotaDispCount');
     const elManut = document.getElementById('frotaManutCount');
     if (elTotal) elTotal.textContent = frotaAtiva.length;
     if (elDisp) elDisp.textContent = disp;
     if (elManut) elManut.textContent = manut;
+
+    // Identifica e atualiza diretamente os 3 cards do topo da aba Frota mesmo sem ID no HTML
+    const tabFrota = document.getElementById('tab-frota');
+    if (tabFrota) {
+        const cardsTopo = tabFrota.querySelectorAll('.card');
+        cardsTopo.forEach(card => {
+            const txt = (card.textContent || '').toLowerCase();
+            const numEl = card.querySelector('strong, .kpi-value, .stat-value, h2, h3, span:last-child');
+            if (!numEl) return;
+
+            if (txt.includes('total de veículos') || txt.includes('total de veiculos')) {
+                numEl.textContent = frotaAtiva.length;
+            } else if (txt.includes('disponíveis') || txt.includes('disponiveis')) {
+                numEl.textContent = disp;
+            } else if (txt.includes('em manutenção') || txt.includes('em manutencao')) {
+                numEl.textContent = manut;
+            }
+        });
+    }
 
     const busca = (document.getElementById('searchFrota')?.value || '').toLowerCase();
     const statusFiltro = document.getElementById('filterStatusFrota')?.value || 'Todos';
@@ -793,7 +819,6 @@ function renderizarFrota() {
         const analise = analisarRegistrosVeiculo(v);
         const docUrgente = analise.maisUrgente;
 
-        // Botão "+ Adicionar" moderno em formato de pílula com borda suave e efeito hover
         let celulaRegistros = `
             <button type="button" onclick="abrirModalRegistrosVeiculo(${v.id})"
                 style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; border: 1px dashed #CBD5E1; background: var(--bg-body); color: var(--text-main); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;"
@@ -894,7 +919,7 @@ function renderizarMotoristas() {
         if (!m.status) m.status = 'Ativo';
     });
 
-    // Garante que o select de filtro exista na barra mesmo se o HTML não tiver sido editado
+    // Garante que o select de filtro exista na barra
     const inputBuscaEl = document.getElementById('searchMotorista');
     const filterBar = inputBuscaEl?.closest('.filter-bar');
     if (filterBar && !document.getElementById('filterStatusMotorista')) {
@@ -910,7 +935,7 @@ function renderizarMotoristas() {
         filterBar.appendChild(selectHTML);
     }
 
-    // Os KPIs do topo contabilizam apenas os motoristas Ativos na empresa
+    // Contabiliza apenas os motoristas Ativos na empresa
     const motoristasAtivos = state.motoristas.filter(m => m.status === 'Ativo');
     let qtdAlerta = 0;
     let qtdVencida = 0;
@@ -921,10 +946,30 @@ function renderizarMotoristas() {
         if (st.codigo === 'Vencida') qtdVencida++;
     });
 
+    // Atualiza por ID (caso exista no HTML)
     const setEl = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
     setEl('motTotalCount', motoristasAtivos.length);
     setEl('motAlertaCount', qtdAlerta);
     setEl('motVencidaCount', qtdVencida);
+
+    // Identifica e atualiza diretamente os 3 cards do topo da aba Motoristas mesmo sem ID no HTML
+    const tabMotoristas = document.getElementById('tab-motoristas');
+    if (tabMotoristas) {
+        const cardsTopo = tabMotoristas.querySelectorAll('.card');
+        cardsTopo.forEach(card => {
+            const txt = (card.textContent || '').toLowerCase();
+            const numEl = card.querySelector('strong, .kpi-value, .stat-value, h2, h3, span:last-child');
+            if (!numEl) return;
+
+            if (txt.includes('motoristas ativos') || txt.includes('total de motoristas')) {
+                numEl.textContent = motoristasAtivos.length;
+            } else if (txt.includes('cnh em alerta') || txt.includes('alerta')) {
+                numEl.textContent = qtdAlerta;
+            } else if (txt.includes('cnh vencida') || txt.includes('vencida')) {
+                numEl.textContent = qtdVencida;
+            }
+        });
+    }
 
     const pill = document.getElementById('motAttentionPill');
     if (pill) {
@@ -1288,6 +1333,47 @@ function configurarFiltros() {
     document.getElementById('filterStatusRota')?.addEventListener('change', renderizarRotas);
     document.getElementById('searchManutencao')?.addEventListener('input', renderizarManutencoesERelatorios);
     document.getElementById('filterStatusManutencao')?.addEventListener('change', renderizarManutencoesERelatorios);
+
+    // Vincula automaticamente o botão "+ Novo veículo" e demais botões de ação do topo
+    document.querySelectorAll('button, .btn-primary').forEach(btn => {
+        const texto = (btn.textContent || '').trim().toLowerCase();
+        if (texto.includes('novo veículo') || texto.includes('novo veiculo') || texto.includes('adicionar veículo')) {
+            btn.style.cursor = 'pointer';
+            btn.onclick = (e) => {
+                e.preventDefault();
+                abrirModalNovoVeiculo();
+            };
+        } else if (texto.includes('novo motorista')) {
+            btn.style.cursor = 'pointer';
+            btn.onclick = (e) => {
+                e.preventDefault();
+                abrirModalMotorista();
+            };
+        } else if (texto.includes('novo cliente')) {
+            btn.style.cursor = 'pointer';
+            btn.onclick = (e) => {
+                e.preventDefault();
+                abrirModalCliente();
+            };
+        } else if (texto.includes('nova rota')) {
+            btn.style.cursor = 'pointer';
+            btn.onclick = (e) => {
+                e.preventDefault();
+                abrirModalRota();
+            };
+        } else if (texto.includes('registrar serviço') || texto.includes('registrar servico')) {
+            btn.style.cursor = 'pointer';
+            btn.onclick = (e) => {
+                e.preventDefault();
+                abrirModalManutencao();
+            };
+        }
+    });
+}
+
+// Atalho de compatibilidade caso o HTML chame abrirModalVeiculo()
+function abrirModalVeiculo() {
+    abrirModalNovoVeiculo();
 }
 
 // ==================== MODAIS E CADASTROS ====================
