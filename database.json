@@ -43,6 +43,28 @@
         "proxTrocaOleo": 50000,
         "dataConferencia": "2026-09-25",
         "obs": "Regular"
+      },
+      "registros": {
+        "ipva": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "2026-11-11",
+          "valor": "15",
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "2026-12-30",
+          "valor": "1500",
+          "obs": "kinross"
+        }
       }
     },
     {
@@ -50,8 +72,8 @@
       "placa": "RTA-8F02",
       "modelo": "Renault Master L3H2",
       "ano": 2022,
-      "capacidade": "16 passageiros",
-      "status": "Inativo",
+      "capacidade": "18 passageiros",
+      "status": "Disponível",
       "documentos": {
         "ipva": {
           "vencimento": "2026-11-03",
@@ -77,9 +99,31 @@
       "km": {
         "atual": 68900,
         "proxTrocaOleo": 70000,
-        "dataConferencia": "2026-09-20",
-        "obs": "Revisão pendente"
-      }
+        "ultimaAtualizacao": "2026-11-12"
+      },
+      "registros": {
+        "ipva": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        }
+      },
+      "inativadoManualmente": false
     },
     {
       "id": 3,
@@ -115,6 +159,28 @@
         "proxTrocaOleo": 25000,
         "dataConferencia": "2026-09-22",
         "obs": ""
+      },
+      "registros": {
+        "ipva": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        }
       }
     },
     {
@@ -122,7 +188,7 @@
       "placa": "BXD-7A14",
       "modelo": "Ford Transit 410",
       "ano": 2021,
-      "capacidade": 10,
+      "capacidade": "12 passageiros",
       "status": "Disponível",
       "documentos": {
         "ipva": {
@@ -149,14 +215,37 @@
       "km": {
         "atual": 82100,
         "proxTrocaOleo": 90000,
-        "ultimaAtualizacao": "2026-11-11"
+        "ultimaAtualizacao": "2026-11-12"
       },
       "docs": {
         "crlv": "",
         "seguro": "",
         "tacografo": "",
         "revisao": ""
-      }
+      },
+      "registros": {
+        "ipva": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        }
+      },
+      "inativadoManualmente": false
     },
     {
       "id": 5,
@@ -192,6 +281,28 @@
         "dataConferencia": "2026-08-15",
         "proxTrocaOleo": 120000,
         "obs": ""
+      },
+      "registros": {
+        "ipva": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        }
       }
     },
     {
@@ -228,6 +339,28 @@
         "dataConferencia": "2026-09-18",
         "proxTrocaOleo": 40000,
         "obs": ""
+      },
+      "registros": {
+        "ipva": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        }
       }
     },
     {
@@ -264,6 +397,28 @@
         "dataConferencia": "2026-09-25",
         "proxTrocaOleo": 20000,
         "obs": ""
+      },
+      "registros": {
+        "ipva": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        }
       }
     },
     {
@@ -300,6 +455,28 @@
         "dataConferencia": "2026-09-27",
         "proxTrocaOleo": 15000,
         "obs": ""
+      },
+      "registros": {
+        "ipva": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        }
       }
     },
     {
@@ -336,6 +513,28 @@
         "proxTrocaOleo": 35000,
         "dataConferencia": "2026-09-20",
         "obs": ""
+      },
+      "registros": {
+        "ipva": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        }
       }
     },
     {
@@ -372,6 +571,28 @@
         "proxTrocaOleo": 60000,
         "dataConferencia": "2026-09-15",
         "obs": ""
+      },
+      "registros": {
+        "ipva": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "licenciamento": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "spvat": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        },
+        "selo": {
+          "vencimento": "",
+          "valor": "",
+          "obs": ""
+        }
       }
     }
   ],
@@ -381,7 +602,8 @@
       "nome": "Carlos Eduardo Lima",
       "cnh": "08945123760",
       "categoria": "D",
-      "validade": "2028-08-18"
+      "validade": "2028-08-18",
+      "telefone": "389999999"
     },
     {
       "id": 2,
@@ -389,7 +611,7 @@
       "cnh": "05478321908",
       "categoria": "D",
       "validade": "2027-01-15",
-      "telefone": "undefined"
+      "telefone": "38999998"
     },
     {
       "id": 3,
@@ -397,21 +619,23 @@
       "cnh": "07321654892",
       "categoria": "E",
       "validade": "2027-01-21",
-      "telefone": "undefined"
+      "telefone": "389945612"
     },
     {
       "id": 4,
       "nome": "Paulo Henrique Alves",
       "cnh": "09123654788",
-      "categoria": "C",
-      "validade": "2029-05-24"
+      "categoria": "D",
+      "validade": "2029-05-24",
+      "telefone": "3899999"
     },
     {
       "id": 5,
       "nome": "André Luiz Costa",
       "cnh": "04652139877",
       "categoria": "D",
-      "validade": "2027-11-05"
+      "validade": "2027-11-05",
+      "telefone": "3899999999"
     }
   ],
   "clientes": [
@@ -423,7 +647,7 @@
       "telefone": "(11) 98765-4321",
       "obs": "Contrato corporativo padrão",
       "status": "Inativo",
-      "rotasRealizadas": 34
+      "rotasRealizadas": 0
     },
     {
       "id": 2,
@@ -433,7 +657,7 @@
       "telefone": "(11) 3456-7890",
       "obs": "Rotas matutinas e vespertinas",
       "status": "Ativo",
-      "rotasRealizadas": 18
+      "rotasRealizadas": 0
     },
     {
       "id": 3,
@@ -448,12 +672,12 @@
     {
       "id": 4,
       "empresa": "BioSaúde",
-      "iniciais": "BS",
+      "iniciais": "BI",
       "contato": "Marcos Nunes",
       "telefone": "(31) 3344-5566",
       "obs": "Laboratórios",
-      "status": "Inativo",
-      "rotasRealizadas": 12
+      "status": "Ativo",
+      "rotasRealizadas": 0
     },
     {
       "id": 1794322978626,
@@ -461,7 +685,7 @@
       "iniciais": "AS",
       "contato": "JOAO",
       "telefone": "38999999",
-      "status": "Inativo",
+      "status": "Ativo",
       "rotasRealizadas": 0,
       "obs": ""
     }
@@ -524,6 +748,28 @@
     }
   ],
   "manutencoes": [
+    {
+      "id": 1794506554365,
+      "codigo": 8,
+      "placa": "BXD-7A14",
+      "data": "2026-11-12",
+      "tipo": "Motor / marcha",
+      "oficina": "PAULINHO CENTER",
+      "custo": 8000,
+      "obs": "",
+      "status": "Concluído"
+    },
+    {
+      "id": 1794506502371,
+      "codigo": 7,
+      "placa": "KLP-3B72",
+      "data": "2026-11-12",
+      "tipo": "Pneus",
+      "oficina": "OFICINA DO VITAO",
+      "custo": 2500,
+      "obs": "",
+      "status": "Concluído"
+    },
     {
       "id": 1794336016976,
       "codigo": 6,

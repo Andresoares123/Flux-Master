@@ -1,5 +1,4 @@
-
-// Data real sincronizada com o relógio do computador
+// ==================== UTILITÁRIOS DE DATA E RELÓGIO REAL ====================
 function obterDataHojeReal() {
     const agora = new Date();
     return new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 12, 0, 0);
@@ -13,11 +12,34 @@ function obterDataHojeISO() {
     return `${ano}-${mes}-${dia}`;
 }
 
+function formatarDataBR(iso) {
+    if (!iso) return '—';
+    const partes = String(iso).split('-');
+    if (partes.length !== 3) return iso;
+    return `${partes[2]}/${partes[1]}/${partes[0]}`;
+}
+
+function formatarDataCurtaMes(iso) {
+    if (!iso) return '—';
+    const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    const partes = String(iso).split('-');
+    if (partes.length !== 3) return iso;
+    const dia = partes[2];
+    const mesIdx = parseInt(partes[1], 10) - 1;
+    return `${dia} ${meses[mesIdx] || ''}`;
+}
+
+function calcularDiasCNH(validadeISO) {
+    if (!validadeISO) return 999;
+    const val = new Date(validadeISO + 'T12:00:00');
+    const hoje = obterDataHojeReal();
+    return Math.ceil((val - hoje) / (1000 * 60 * 60 * 24));
+}
+
 function atualizarRelogioCabecalho() {
     const agora = new Date();
     const opcoes = { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' };
     const formatada = agora.toLocaleDateString('pt-BR', opcoes);
-    // Deixa a primeira letra maiúscula (ex: "Domingo, 08 de novembro de 2026")
     const textoFinal = formatada.charAt(0).toUpperCase() + formatada.slice(1);
 
     const elData = document.getElementById('currentDateText');
@@ -26,15 +48,92 @@ function atualizarRelogioCabecalho() {
     const elDataRotas = document.getElementById('rotasDateSub');
     if (elDataRotas) elDataRotas.textContent = textoFinal;
 
-    // Saudação dinâmica conforme o horário
     const hora = agora.getHours();
     const saudacao = hora < 12 ? 'Tenha um ótimo dia' : (hora < 18 ? 'Tenha uma ótima tarde' : 'Tenha uma ótima noite');
     const elSaudacao = document.querySelector('.greeting-box span');
     if (elSaudacao) elSaudacao.textContent = saudacao;
 }
 
-// Automação de Ciclo Diário: Rotas + Manutenções + Sincronização da Frota
-async function verificarStatusRotasAutomatico() {
+// ==================== ESTRUTURA DE REGISTROS E CAPACIDADE ====================
+function garantirEstruturaRegistros(v) {
+    if (!v.registros) {
+        const docsAntigos = v.docs || {};
+        v.registros = {
+            ipva: {
+                vencimento: docsAntigos.crlv || '',
+                valor: docsAntigos.crlv ? 'R$ 1.480,00' : '',
+                obs: docsAntigos.crlv ? 'Pagamento realizado em cota única.' : ''
+            },
+            licenciamento: {
+                vencimento: docsAntigos.seguro || '',
+                valor: docsAntigos.seguro ? 'R$ 167,40' : '',
+                obs: docsAntigos.seguro ? 'Licenciamento anual quitado.' : ''
+            },
+            spvat: {
+                vencimento: docsAntigos.tacografo || '',
+                valor: docsAntigos.tacografo ? 'R$ 92,00' : '',
+                obs: docsAntigos.tacografo ? 'Pagamento realizado via transferência.' : ''
+            },
+            selo: {
+                vencimento: docsAntigos.revisao || '',
+                valor: docsAntigos.revisao ? 'R$ 75,00' : '',
+                obs: docsAntigos.revisao ? 'Selo anual emitido e fixado no veículo.' : ''
+            }
+        };
+    }
+    return v.registros;
+}
+
+function analisarRegistrosVeiculo(v) {
+    const reg = garantirEstruturaRegistros(v);
+    const catalogo = [
+        { chave: 'ipva', nome: 'IPVA', desc: 'Imposto sobre a propriedade do veículo' },
+        { chave: 'licenciamento', nome: 'Licenciamento', desc: 'Licenciamento anual do veículo' },
+        { chave: 'spvat', nome: 'SPVAT', desc: 'Seguro obrigatório do veículo' },
+        { chave: 'selo', nome: 'SELO', desc: 'Selo e identificação anual do veículo' }
+    ];
+
+    const preenchidos = [];
+    catalogo.forEach(item => {
+        const dados = reg[item.chave] || { vencimento: '', valor: '', obs: '' };
+        if (dados.vencimento) {
+            const dias = calcularDiasCNH(dados.vencimento);
+            preenchidos.push({
+                ...item,
+                vencimento: dados.vencimento,
+                valor: dados.valor || '',
+                obs: dados.obs || '',
+                dias
+            });
+        }
+    });
+
+    preenchidos.sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+
+    const vencidos = preenchidos.filter(r => r.dias < 0);
+    const proximos = preenchidos.filter(r => r.dias >= 0 && r.dias <= 30);
+
+    return {
+        todosPreenchidos: preenchidos,
+        maisUrgente: preenchidos.length > 0 ? preenchidos[0] : null,
+        temVencido: vencidos.length > 0,
+        temProximo: proximos.length > 0,
+        vencidos,
+        proximos
+    };
+}
+
+function obterNumeroCapacidade(val) {
+    const num = parseInt(String(val || '').replace(/\D/g, ''), 10);
+    return isNaN(num) || num <= 0 ? 15 : num;
+}
+
+function formatarCapacidadePassageiros(val) {
+    return `${obterNumeroCapacidade(val)} passageiros`;
+}
+
+// ==================== AUTOMAÇÃO DE CICLO DIÁRIO E INTEGRIDADE ====================
+async function verificarStatusRotasAutomatico(apenasAjustarMemoria = false) {
     if (!state || !state.rotas || !state.veiculos) return;
 
     const agora = new Date();
@@ -42,9 +141,7 @@ async function verificarStatusRotasAutomatico() {
     const minutosAgora = agora.getHours() * 60 + agora.getMinutes();
     let houveMudanca = false;
 
-    // 1. Automação das Manutenções:
-    // - Se não está Concluído e a data é futura (> hojeISO) -> fica "Agendado"
-    // - Se não está Concluído e chegou o dia (<= hojeISO) -> passa automaticamente para "Em andamento"
+    // 1. Automação das Manutenções por data
     if (state.manutencoes) {
         state.manutencoes.forEach(m => {
             if (m.status === 'Concluído' || !m.data) return;
@@ -59,12 +156,11 @@ async function verificarStatusRotasAutomatico() {
         });
     }
 
-    // 2. Atualiza o ciclo das rotas (Agendada <-> Em andamento) conforme horário do PC
+    // 2. Ciclo de Rotas (Agendada <-> Em andamento conforme horário do PC)
     state.rotas.forEach(r => {
         if (r.status === 'Finalizada') return;
         if (!r.horaInicio || !r.horaFim) return;
 
-        // Correção de integridade: se a rota ativa apontava para um veículo "Vendido", realoca
         const veiculoDaRota = state.veiculos.find(v => v.id === Number(r.veiculoId));
         if (veiculoDaRota && veiculoDaRota.status === 'Vendido') {
             const substituto = state.veiculos.find(v => v.status === 'Disponível');
@@ -88,20 +184,34 @@ async function verificarStatusRotasAutomatico() {
         }
     });
 
-    // 3. Sincroniza o status de cada veículo na Frota com as Rotas e Manutenções reais
+    // 3. Sincroniza documentos e status dos veículos
     state.veiculos.forEach(v => {
+        garantirEstruturaRegistros(v);
+
+        const capFormatada = formatarCapacidadePassageiros(v.capacidade);
+        if (v.capacidade !== capFormatada) {
+            v.capacidade = capFormatada;
+            houveMudanca = true;
+        }
+
         if (v.status === 'Vendido') return;
 
-        // Só bloqueia o veículo na frota se a manutenção estiver "Em andamento" hoje!
-        // (Se estiver apenas "Agendado" para amanhã, o veículo segue Disponível hoje)
+        const analiseDoc = analisarRegistrosVeiculo(v);
+
+        // Se tiver documento vencido -> fica Inativo
+        if (analiseDoc.temVencido) {
+            if (v.status !== 'Inativo') {
+                v.status = 'Inativo';
+                houveMudanca = true;
+            }
+            return;
+        }
+
         const temManutencaoEmAndamento = state.manutencoes && state.manutencoes.some(
             m => m.placa === v.placa && m.status === 'Em andamento'
         );
         const temRotaEmAndamento = state.rotas.some(
             r => Number(r.veiculoId) === v.id && r.status === 'Em andamento'
-        );
-        const temRotaAgendada = state.rotas.some(
-            r => Number(r.veiculoId) === v.id && r.status === 'Agendada'
         );
 
         let statusCorreto = v.status;
@@ -110,12 +220,11 @@ async function verificarStatusRotasAutomatico() {
             statusCorreto = 'Em manutenção';
         } else if (temRotaEmAndamento) {
             statusCorreto = 'Em rota';
-        } else if (temRotaAgendada && v.status === 'Inativo') {
-            statusCorreto = 'Disponível';
-        } else if (!temManutencaoEmAndamento && v.status === 'Em manutenção') {
-            // Assim que a manutenção é marcada como "Concluído" (ou "Agendado" para o futuro), o veículo volta a ficar Disponível!
-            statusCorreto = 'Disponível';
-        } else if (!temRotaEmAndamento && v.status === 'Em rota') {
+        } else if (
+            (!temManutencaoEmAndamento && v.status === 'Em manutenção') ||
+            (!temRotaEmAndamento && v.status === 'Em rota') ||
+            (!analiseDoc.temVencido && v.status === 'Inativo' && !v.inativadoManualmente)
+        ) {
             statusCorreto = 'Disponível';
         }
 
@@ -125,13 +234,13 @@ async function verificarStatusRotasAutomatico() {
         }
     });
 
-    if (houveMudanca) {
+    if (houveMudanca && !apenasAjustarMemoria) {
         await salvarEstado();
         renderizarTudo();
     }
 }
 
-// Estado Global
+// ==================== ESTADO GLOBAL E DADOS PADRÃO ====================
 let state = {
     veiculos: [],
     motoristas: [],
@@ -140,68 +249,43 @@ let state = {
     manutencoes: []
 };
 
-// Dados Iniciais Completos 
 const fallbackData = {
     veiculos: [
-        { id: 1, placa: 'QWE-4D21', modelo: 'Mercedes Sprinter 417', ano: 2023, capacidade: '15 passageiros', status: 'Disponível',
-          documentos: { ipva: { vencimento: '2026-10-15', valor: 3200, obs: 'Cota única' }, licenciamento: { vencimento: '2026-11-30', valor: 160, obs: '' }, spvat: { vencimento: '2026-10-15', valor: 120, obs: '' }, selo: { vencimento: '2026-12-10', valor: 250, obs: '' } },
-          km: { atual: 45200, dataConferencia: '2026-09-25', proxTrocaOleo: 50000, obs: 'Regular' } },
-        { id: 2, placa: 'RTA-8F02', modelo: 'Renault Master L3H2', ano: 2022, capacidade: '16 passageiros', status: 'Em manutenção',
-          documentos: { ipva: { vencimento: '2026-11-03', valor: 2900, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
-          km: { atual: 68900, dataConferencia: '2026-09-20', proxTrocaOleo: 68000, obs: 'Revisão pendente' } },
-        { id: 3, placa: 'LMN-2G89', modelo: 'Fiat Ducato Minibus', ano: 2024, capacidade: '17 passageiros', status: 'Disponível',
-          documentos: { ipva: { vencimento: '', valor: 0, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
-          km: { atual: 18400, dataConferencia: '2026-09-22', proxTrocaOleo: 25000, obs: '' } },
-        { id: 4, placa: 'BXD-7A14', modelo: 'Ford Transit 410', ano: 2021, capacidade: '14 passageiros', status: 'Em rota',
-          documentos: { ipva: { vencimento: '2026-12-28', valor: 2650, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
-          km: { atual: 82100, dataConferencia: '2026-09-28', proxTrocaOleo: 90000, obs: '' } },
-        { id: 5, placa: 'HJK-9C33', modelo: 'Volkswagen Crafter', ano: 2020, capacidade: '16 passageiros', status: 'Inativo',
-          documentos: { ipva: { vencimento: '', valor: 0, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
-          km: { atual: 112000, dataConferencia: '2026-08-15', proxTrocaOleo: 120000, obs: '' } },
-        { id: 6, placa: 'KLP-3B72', modelo: 'Iveco Daily Minibus', ano: 2023, capacidade: '16 passageiros', status: 'Disponível',
-          documentos: { ipva: { vencimento: '2027-01-18', valor: 3100, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
-          km: { atual: 34000, dataConferencia: '2026-09-18', proxTrocaOleo: 40000, obs: '' } },
-        { id: 7, placa: 'MNO-6E41', modelo: 'Mercedes Sprinter 416', ano: 2024, capacidade: '15 passageiros', status: 'Disponível',
-          documentos: { ipva: { vencimento: '', valor: 0, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
-          km: { atual: 12300, dataConferencia: '2026-09-25', proxTrocaOleo: 20000, obs: '' } },
-        { id: 8, placa: 'PQR-1A99', modelo: 'Mercedes Sprinter 517', ano: 2024, capacidade: '18 passageiros', status: 'Disponível',
-          documentos: { ipva: { vencimento: '2027-02-10', valor: 3500, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
-          km: { atual: 9500, dataConferencia: '2026-09-27', proxTrocaOleo: 15000, obs: '' } },
-        { id: 9, placa: 'STU-4B22', modelo: 'Renault Master Minibus', ano: 2023, capacidade: '16 passageiros', status: 'Disponível',
-          documentos: { ipva: { vencimento: '2027-03-05', valor: 2950, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
-          km: { atual: 27400, dataConferencia: '2026-09-20', proxTrocaOleo: 35000, obs: '' } },
-        { id: 10, placa: 'VWX-8C55', modelo: 'Fiat Ducato Executiva', ano: 2022, capacidade: '15 passageiros', status: 'Em manutenção',
-          documentos: { ipva: { vencimento: '2026-12-12', valor: 2800, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
-          km: { atual: 54000, dataConferencia: '2026-09-15', proxTrocaOleo: 60000, obs: '' } }
+        { id: 1, placa: 'QWE-4D21', modelo: 'Mercedes Sprinter 417', ano: 2023, capacidade: '15 passageiros', status: 'Inativo', km: { atual: 45200, proxTrocaOleo: 50000 }, docs: { crlv: '2026-10-30', seguro: '2026-11-20', tacografo: '2026-12-15', revisao: '2027-01-10' } },
+        { id: 2, placa: 'RTA-8F02', modelo: 'Renault Master L3H2', ano: 2022, capacidade: '16 passageiros', status: 'Inativo', km: { atual: 68900, proxTrocaOleo: 70000 }, docs: { crlv: '2026-11-03', seguro: '2027-02-10', tacografo: '2027-01-20', revisao: '2026-12-01' } },
+        { id: 3, placa: 'BXD-7A14', modelo: 'Ford Transit 410', ano: 2021, capacidade: '14 passageiros', status: 'Disponível', km: { atual: 81300, proxTrocaOleo: 90000 }, docs: { crlv: '2026-12-20', seguro: '2027-04-15', tacografo: '2027-03-10', revisao: '2027-02-01' } },
+        { id: 4, placa: 'HJK-9C33', modelo: 'Volkswagen Crafter', ano: 2020, capacidade: '16 passageiros', status: 'Disponível', km: { atual: 94000, proxTrocaOleo: 100000 }, docs: { crlv: '', seguro: '', tacografo: '', revisao: '' } },
+        { id: 5, placa: 'KLP-3B72', modelo: 'Iveco Daily Minibus', ano: 2023, capacidade: '16 passageiros', status: 'Disponível', km: { atual: 31500, proxTrocaOleo: 40000 }, docs: { crlv: '2027-01-18', seguro: '2027-05-12', tacografo: '2027-04-01', revisao: '2027-03-15' } },
+        { id: 6, placa: 'MNO-6E41', modelo: 'Mercedes Sprinter 416', ano: 2024, capacidade: '15 passageiros', status: 'Disponível', km: { atual: 18400, proxTrocaOleo: 25000 }, docs: { crlv: '', seguro: '', tacografo: '', revisao: '' } },
+        { id: 7, placa: 'PQR-1A99', modelo: 'Mercedes Sprinter 517', ano: 2024, capacidade: '18 passageiros', status: 'Disponível', km: { atual: 12100, proxTrocaOleo: 20000 }, docs: { crlv: '2027-02-10', seguro: '2027-06-20', tacografo: '2027-05-10', revisao: '2027-04-10' } },
+        { id: 8, placa: 'STU-4B22', modelo: 'Renault Master Minibus', ano: 2023, capacidade: '16 passageiros', status: 'Disponível', km: { atual: 39800, proxTrocaOleo: 45000 }, docs: { crlv: '2027-03-05', seguro: '2027-07-01', tacografo: '2027-06-15', revisao: '2027-05-20' } },
+        { id: 9, placa: 'VWX-8C55', modelo: 'Fiat Ducato Executiva', ano: 2022, capacidade: '15 passageiros', status: 'Disponível', km: { atual: 55700, proxTrocaOleo: 60000 }, docs: { crlv: '2026-12-12', seguro: '2027-03-18', tacografo: '2027-02-25', revisao: '2027-01-30' } }
     ],
     motoristas: [
-        { id: 1, nome: 'Carlos Eduardo Lima', cnh: '08945123760', categoria: 'D', validade: '2028-08-18' },
-        { id: 2, nome: 'Márcia Vieira Souza', cnh: '05478321908', categoria: 'D', validade: '2026-10-02' },
-        { id: 3, nome: 'João Marcos Reis', cnh: '07321654892', categoria: 'E', validade: '2026-10-12' },
-        { id: 4, nome: 'Paulo Henrique Alves', cnh: '09123654788', categoria: 'C', validade: '2029-05-24' },
-        { id: 5, nome: 'André Luiz Costa', cnh: '04652139877', categoria: 'D', validade: '2026-09-21' }
+        { id: 1, nome: 'Carlos Eduardo Lima', cnh: '04829173650', categoria: 'D', validade: '2027-08-14', telefone: '(11) 98765-4321' },
+        { id: 2, nome: 'João Marcos Pereira', cnh: '07391826455', categoria: 'D', validade: '2027-04-22', telefone: '(11) 99123-4567' },
+        { id: 3, nome: 'Márcia Vieira Santos', cnh: '05918273641', categoria: 'E', validade: '2026-11-25', telefone: '(11) 97654-3210' },
+        { id: 4, nome: 'Roberto Alves Costa', cnh: '08273645190', categoria: 'D', validade: '2026-10-05', telefone: '(11) 96543-2109' },
+        { id: 5, nome: 'Paulo Henrique Souza', cnh: '09182736452', categoria: 'D', validade: '2028-01-19', telefone: '(11) 95432-1098' }
     ],
     clientes: [
-        { id: 1, empresa: 'Grupo Horizonte', iniciais: 'GH', contato: 'Ana Martins', telefone: '(11) 98765-4321', obs: 'Contrato corporativo padrão', status: 'Ativo', rotasRealizadas: 34 },
-        { id: 2, empresa: 'Instituto Ideal', iniciais: 'II', contato: 'Ricardo Sales', telefone: '(11) 3456-7890', obs: 'Rotas matutinas e vespertinas', status: 'Ativo', rotasRealizadas: 18 },
-        { id: 3, empresa: 'Construtora Vértice', iniciais: 'CV', contato: 'Beatriz Rocha', telefone: '(21) 99876-1204', obs: 'Engenharia e obras', status: 'Ativo', rotasRealizadas: 27 },
-        { id: 4, empresa: 'BioSaúde', iniciais: 'BS', contato: 'Marcos Nunes', telefone: '(31) 3344-5566', obs: 'Laboratórios', status: 'Inativo', rotasRealizadas: 12 }
+        { id: 1, empresa: 'Instituto Ideal', iniciais: 'II', contato: 'Ricardo Sales', telefone: '(11) 3456-7890', rotasRealizadas: 18, status: 'Ativo' },
+        { id: 2, empresa: 'Construtora Vértice', iniciais: 'CV', contato: 'Beatriz Rocha', telefone: '(21) 99876-1204', rotasRealizadas: 27, status: 'Ativo' },
+        { id: 3, empresa: 'BioSaúde', iniciais: 'BS', contato: 'Fernanda Lima', telefone: '(11) 3210-9876', rotasRealizadas: 12, status: 'Inativo' }
     ],
     rotas: [
-        { id: 1, clienteId: 1, veiculoId: 1, motoristaId: 1, data: '2026-09-28', periodo: 'Manhã', horaInicio: '08:00', horaFim: '10:00', status: 'Em andamento' },
-        { id: 2, clienteId: 2, veiculoId: 3, motoristaId: 2, data: '2026-09-28', periodo: 'Manhã', horaInicio: '10:30', horaFim: '12:30', status: 'Em andamento' },
-        { id: 3, clienteId: 3, veiculoId: 4, motoristaId: 3, data: '2026-09-28', periodo: 'Tarde', horaInicio: '13:45', horaFim: '15:30', status: 'Em andamento' },
-        { id: 4, clienteId: 4, veiculoId: 5, motoristaId: 4, data: '2026-09-28', periodo: 'Noite', horaInicio: '18:00', horaFim: '20:00', status: 'Finalizada' }
+        { id: 1, clienteId: 1, veiculoId: 5, motoristaId: 1, data: '2026-11-10', periodo: 'Manhã', horaInicio: '10:30', horaFim: '12:30', status: 'Em andamento' },
+        { id: 2, clienteId: 2, veiculoId: 3, motoristaId: 2, data: '2026-11-11', periodo: 'Tarde', horaInicio: '13:45', horaFim: '15:30', status: 'Agendada' },
+        { id: 3, clienteId: 3, veiculoId: 4, motoristaId: 5, data: '2026-11-11', periodo: 'Noite', horaInicio: '18:00', horaFim: '20:00', status: 'Agendada' }
     ],
     manutencoes: [
-        { id: 1, codigo: 1, veiculoId: 2, placa: 'RTA-8F02', data: '2026-09-26', tipo: 'Sistema de freios', oficina: 'Auto Center Norte', obs: '', custo: 2480, status: 'Em andamento' },
-        { id: 2, codigo: 2, veiculoId: 1, placa: 'QWE-4D21', data: '2026-09-18', tipo: 'Troca de óleo', oficina: 'Oficina Avenida', obs: '', custo: 690, status: 'Concluído' },
-        { id: 3, codigo: 3, veiculoId: 5, placa: 'HJK-9C33', data: '2026-09-12', tipo: 'Pneus', oficina: 'Pneus Brasil', obs: 'Substituição dos pneus dianteiros.', custo: 3220, status: 'Concluído' },
-        { id: 4, codigo: 4, veiculoId: 3, placa: 'LMN-2G89', data: '2026-09-04', tipo: 'Preventiva', oficina: 'Fiat Pro', obs: 'Revisão preventiva completa.', custo: 1340, status: 'Concluído' }
+        { id: 1, codigo: 1, placa: 'QWE-4D21', data: '2026-10-16', tipo: 'Sistema de freios', oficina: 'Auto Center Norte', obs: 'Troca de pastilhas e discos', custo: 1250, status: 'Concluído' },
+        { id: 2, codigo: 2, placa: 'BXD-7A14', data: '2026-10-22', tipo: 'Pneus', oficina: 'Pneus & Cia', obs: 'Alinhamento e 2 pneus novos', custo: 2400, status: 'Concluído' },
+        { id: 3, codigo: 3, placa: 'MNO-6E41', data: '2026-11-05', tipo: 'Preventiva', oficina: 'Oficina Diesel Pro', obs: 'Revisão periódica completa', custo: 1300, status: 'Concluído' }
     ]
 };
 
-// Inicialização
+// ==================== INICIALIZAÇÃO SEGURA ====================
 document.addEventListener('DOMContentLoaded', async () => {
     if (!localStorage.getItem('lm_token')) {
         window.location.href = '/index.html';
@@ -209,7 +293,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const userName = localStorage.getItem('lm_user') || 'Lucas Mendes';
-    document.getElementById('userNameDisplay').textContent = userName;
+    const userEl = document.getElementById('userNameDisplay');
+    if (userEl) userEl.textContent = userName;
 
     atualizarRelogioCabecalho();
     configurarTemas();
@@ -217,22 +302,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     configurarFiltros();
 
     await carregarDados();
-    await verificarStatusRotasAutomatico();
+    await verificarStatusRotasAutomatico(true);
+    await salvarEstado();
     renderizarTudo();
 
-    // Verifica o relógio e atualiza status das rotas automaticamente a cada 30 segundos
     setInterval(async () => {
         atualizarRelogioCabecalho();
-        await verificarStatusRotasAutomatico();
+        await verificarStatusRotasAutomatico(false);
     }, 30000);
 });
 
 async function carregarDados() {
     try {
-        // 1. Prioriza sempre o banco de dados do servidor (database.json)
         const res = await fetch('/api/dados');
         const serverData = await res.json();
-        
+
         if (serverData && serverData.veiculos && serverData.veiculos.length > 0) {
             state = serverData;
             localStorage.setItem('lm_state_v1', JSON.stringify(state));
@@ -242,7 +326,6 @@ async function carregarDados() {
         console.warn('Servidor indisponível no momento, buscando cache local...');
     }
 
-    // 2. Fallback: usa o localStorage caso o servidor não responda
     const salvoLocal = localStorage.getItem('lm_state_v1');
     if (salvoLocal) {
         state = JSON.parse(salvoLocal);
@@ -261,198 +344,244 @@ async function salvarEstado() {
             body: JSON.stringify(state)
         });
     } catch (e) {
-        console.warn('Salvo em localStorage');
+        console.warn('Salvo localmente no navegador.');
     }
 }
 
-// Temas
 function configurarTemas() {
-    const themeSelect = document.getElementById('themeSelect');
-    const savedTheme = localStorage.getItem('lm_theme') || 'claro';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    themeSelect.value = savedTheme;
+    const sel = document.getElementById('themeSelect');
+    if (sel && sel.options.length > 0) {
+        const valoresOpcoes = Array.from(sel.options).map(o => o.value);
+        let temaSalvo = localStorage.getItem('lm_theme');
 
-    themeSelect.addEventListener('change', (e) => {
-        const t = e.target.value;
-        document.documentElement.setAttribute('data-theme', t);
-        localStorage.setItem('lm_theme', t);
-    });
+        // Se o valor salvo não existir nas opções do HTML, usa a primeira opção ("Claro")
+        if (!temaSalvo || !valoresOpcoes.includes(temaSalvo)) {
+            temaSalvo = valoresOpcoes[0];
+        }
 
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-        localStorage.removeItem('lm_token');
-        window.location.href = '/index.html';
-    });
+        const aplicarTema = (valor) => {
+            const isDark = valor === 'dark' || valor === 'escuro' || valor.toLowerCase().includes('escuro');
+            document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+            document.body.setAttribute('data-theme', valor);
+            document.body.classList.toggle('dark-mode', isDark);
+            document.body.classList.toggle('dark', isDark);
+        };
+
+        sel.value = temaSalvo;
+        aplicarTema(temaSalvo);
+
+        sel.addEventListener('change', () => {
+            aplicarTema(sel.value);
+            localStorage.setItem('lm_theme', sel.value);
+        });
+    }
 
     const notifBtn = document.getElementById('notifBtn');
     const notifDropdown = document.getElementById('notifDropdown');
-    notifBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        notifDropdown.classList.toggle('open');
-    });
-    document.addEventListener('click', () => notifDropdown.classList.remove('open'));
+    if (notifBtn && notifDropdown) {
+        notifBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            notifDropdown.classList.toggle('open');
+        });
+        document.addEventListener('click', () => notifDropdown.classList.remove('open'));
+    }
+
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('lm_token');
+            window.location.href = '/index.html';
+        });
+    }
 }
 
-// Navegação SPA
-const titulosAbas = {
-    inicio: 'Painel operacional',
-    frota: 'Frota de veículos',
-    motoristas: 'Motoristas',
-    clientes: 'Clientes corporativos',
-    rotas: 'Rotas',
-    manutencoes: 'Manutenções',
-    relatorios: 'Relatórios'
-};
+function descobrirAbaDoBotao(btn) {
+    if (btn.dataset.tab) return btn.dataset.tab.replace(/^tab-/, '');
+    if (btn.dataset.target) return btn.dataset.target.replace(/^#?tab-/, '');
+    if (btn.dataset.section) return btn.dataset.section.replace(/^tab-/, '');
+
+    const txt = (btn.textContent || '').toLowerCase();
+    if (txt.includes('início') || txt.includes('inicio')) return 'inicio';
+    if (txt.includes('frota')) return 'frota';
+    if (txt.includes('motorista')) return 'motoristas';
+    if (txt.includes('cliente')) return 'clientes';
+    if (txt.includes('rota')) return 'rotas';
+    if (txt.includes('manuten')) return 'manutencoes';
+    if (txt.includes('relat')) return 'relatorios';
+    return null;
+}
 
 function configurarNavegacao() {
-    document.querySelectorAll('.nav-item').forEach(btn => {
-        btn.addEventListener('click', () => navegarPara(btn.dataset.tab));
+    // Captura qualquer botão ou link do menu de navegação superior
+    const botoesMenu = document.querySelectorAll(
+        '[data-tab], [data-target], [data-section], .nav-btn, .nav-item, .nav-link, .tab-btn, header nav button, header nav a, .top-nav button, .top-nav a'
+    );
+
+    botoesMenu.forEach(btn => {
+        const aba = descobrirAbaDoBotao(btn);
+        if (!aba) return;
+
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            navegarPara(aba);
+        });
     });
 }
 
-function navegarPara(tabId) {
-    document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
-    document.querySelectorAll('.tab-section').forEach(sec => sec.classList.toggle('active', sec.id === `tab-${tabId}`));
-    document.getElementById('subHeaderTitle').textContent = titulosAbas[tabId] || 'Painel operacional';
+function navegarPara(aba) {
+    const abaLimpa = String(aba).replace(/^#?tab-/, '');
+
+    // Atualiza o botão ativo no menu superior
+    const botoesMenu = document.querySelectorAll(
+        '[data-tab], [data-target], [data-section], .nav-btn, .nav-item, .nav-link, .tab-btn, header nav button, header nav a, .top-nav button, .top-nav a'
+    );
+    botoesMenu.forEach(b => {
+        const abaBotao = descobrirAbaDoBotao(b);
+        if (abaBotao) {
+            b.classList.toggle('active', abaBotao === abaLimpa);
+        }
+    });
+
+    // Exibe a seção correspondente à aba clicada e oculta as demais
+    const secoes = document.querySelectorAll('.tab-section, .tab-content, section[id^="tab-"]');
+    secoes.forEach(sec => {
+        const isEstaAba = sec.id === `tab-${abaLimpa}` || sec.id === abaLimpa;
+        sec.classList.toggle('active', isEstaAba);
+        sec.style.display = isEstaAba ? 'block' : 'none';
+    });
+
+    const titulos = {
+        'inicio': 'Painel operacional',
+        'frota': 'Frota de veículos',
+        'motoristas': 'Motoristas',
+        'clientes': 'Clientes corporativos',
+        'rotas': 'Rotas',
+        'manutencoes': 'Manutenções',
+        'relatorios': 'Relatórios'
+    };
+    const titleEl = document.getElementById('pageHeaderTitle');
+    if (titleEl && titulos[abaLimpa]) titleEl.textContent = titulos[abaLimpa];
+
+    // Garante que os dados da aba aberta estejam sempre atualizados na tela
     renderizarTudo();
 }
 
-// Utilitários de Datas e CNH
-function formatarDataBR(isoStr) {
-    if (!isoStr) return '';
-    const [a, m, d] = isoStr.split('-');
-    return `${d}/${m}/${a}`;
+function irParaNotificacao(aba) {
+    const notifDropdown = document.getElementById('notifDropdown');
+    if (notifDropdown) notifDropdown.classList.remove('open');
+    navegarPara(aba);
 }
 
-function formatarDataCurtaMes(isoStr) {
-    if (!isoStr) return '';
-    const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-    const [a, m, d] = isoStr.split('-');
-    return `${d} ${meses[parseInt(m, 10) - 1]} ${a}`;
+function abrirNotificacoesPeloBanner(e) {
+    if (e) e.stopPropagation();
+    const notifDropdown = document.getElementById('notifDropdown');
+    if (notifDropdown) notifDropdown.classList.add('open');
 }
 
-function calcularDiasCNH(validadeISO) {
-    const val = new Date(validadeISO + 'T12:00:00');
-    const hoje = obterDataHojeReal();
-    return Math.ceil((val - hoje) / (1000 * 60 * 60 * 24));
-}
-
-function obterStatusCNH(validadeISO) {
-    const dias = calcularDiasCNH(validadeISO);
-    if (dias < 0) {
-        return { codigo: 'Vencida', label: `• Vencida`, classe: 'red', rowClass: 'row-risk-danger', bloqueadoRota: true, motivo: 'CNH vencida' };
-    }
-    if (dias <= 5) {
-        return { codigo: 'Alerta', label: `• Vence em ${dias} dias`, classe: 'red', rowClass: 'row-risk-danger', bloqueadoRota: true, motivo: `CNH vence em ${dias} dias (menos de 5 dias)` };
-    }
-    if (dias <= 30) {
-        return { codigo: 'Alerta', label: `• Vence em ${dias} dias`, classe: 'orange', rowClass: 'row-risk-warning', bloqueadoRota: false, motivo: '' };
-    }
-    return { codigo: 'Regular', label: '• Regular', classe: 'green', rowClass: '', bloqueadoRota: false, motivo: '' };
-}
-
-function obterProximoVencimentoVeiculo(v) {
-    if (!v.documentos) return null;
-    const datas = Object.values(v.documentos)
-        .map(d => d.vencimento)
-        .filter(Boolean)
-        .sort();
-    return datas.length > 0 ? datas[0] : null;
-}
-
-// Renderização Geral
+// ==================== RENDERIZAÇÃO BLINDADA DE TODAS AS ABAS ====================
 function renderizarTudo() {
-    renderizarNotificacoes();
-    renderizarDashboard();
-    renderizarFrota();
-    renderizarMotoristas();
-    renderizarClientes();
-    renderizarRotas();
-    renderizarManutencoesERelatorios();
+    const etapas = [
+        renderizarNotificacoes,
+        renderizarDashboard,
+        renderizarFrota,
+        renderizarMotoristas,
+        renderizarClientes,
+        renderizarRotas,
+        renderizarManutencoesERelatorios
+    ];
+
+    etapas.forEach(fn => {
+        try {
+            fn();
+        } catch (err) {
+            console.error(`Erro ao executar ${fn.name}:`, err);
+        }
+    });
 }
 
-// 1. Notificações Clicáveis + Controle Dinâmico do Banner Principal
+// 1. Notificações Automáticas
 function renderizarNotificacoes() {
-    const list = document.getElementById('notifList');
-    const badgeCount = document.getElementById('notifCount');
-    const dashBanner = document.getElementById('dashAlertBanner');
-    const dashAlertText = document.getElementById('dashAlertText');
     const notificacoes = [];
-
-    let qtdCnh = 0;
+    let qtdMotoristas = 0;
     let qtdVeiculos = 0;
 
     state.motoristas.forEach(m => {
         const st = obterStatusCNH(m.validade);
         if (st.codigo !== 'Regular') {
-            qtdCnh++;
+            qtdMotoristas++;
             notificacoes.push({
-                titulo: `CNH: ${m.nome}`,
-                desc: `${st.label.replace('• ', '')} (${formatarDataBR(m.validade)})`,
+                titulo: `CNH ${st.codigo === 'Vencida' ? 'Vencida' : 'Próxima do vencimento'}: ${m.nome}`,
+                desc: `${st.texto} (Vencimento: ${formatarDataBR(m.validade)})`,
                 aba: 'motoristas'
             });
         }
     });
 
-    // Filtra apenas veículos ativos da empresa (não vendidos)
-    const frotaAtiva = state.veiculos.filter(v => v.status !== 'Vendido');
+    state.veiculos.filter(v => v.status !== 'Vendido').forEach(v => {
+        const analise = analisarRegistrosVeiculo(v);
 
-    frotaAtiva.forEach(v => {
-        if (v.km && v.km.atual >= v.km.proxTrocaOleo) {
-            qtdVeiculos++;
-            notificacoes.push({
-                titulo: `Revisão vencida: ${v.placa}`,
-                desc: `KM atual (${v.km.atual}) ultrapassou troca de óleo`,
-                aba: 'frota'
-            });
-        }
-        const proxDoc = obterProximoVencimentoVeiculo(v);
-        if (proxDoc) {
-            const diasDoc = calcularDiasCNH(proxDoc);
-            if (diasDoc <= 30) {
+        analise.todosPreenchidos.forEach(doc => {
+            if (doc.dias < 0) {
                 qtdVeiculos++;
                 notificacoes.push({
-                    titulo: `Documento (${diasDoc < 0 ? 'Vencido' : 'Próximo'}): ${v.placa}`,
-                    desc: `Vencimento em ${formatarDataBR(proxDoc)}`,
+                    titulo: `${doc.nome} Vencido (Veículo Inativado): ${v.placa}`,
+                    desc: `Venceu há ${Math.abs(doc.dias)} dias (${formatarDataBR(doc.vencimento)})`,
+                    aba: 'frota'
+                });
+            } else if (doc.dias <= 30) {
+                qtdVeiculos++;
+                notificacoes.push({
+                    titulo: `${doc.nome} próximo do vencimento: ${v.placa}`,
+                    desc: `Vence em ${doc.dias === 0 ? 'hoje' : doc.dias + ' dias'} (${formatarDataBR(doc.vencimento)})`,
                     aba: 'frota'
                 });
             }
+        });
+
+        if (v.km && (v.km.proxTrocaOleo - v.km.atual <= 1500)) {
+            qtdVeiculos++;
+            const restante = v.km.proxTrocaOleo - v.km.atual;
+            notificacoes.push({
+                titulo: `Revisão/Óleo por KM: ${v.placa}`,
+                desc: restante <= 0 ? `KM excedido em ${Math.abs(restante)} km` : `Faltam apenas ${restante} km para troca`,
+                aba: 'frota'
+            });
         }
     });
 
-    // Atualiza o contador do sino
-    badgeCount.textContent = notificacoes.length;
-    badgeCount.style.display = notificacoes.length > 0 ? 'flex' : 'none';
+    const badge = document.getElementById('notifCountBadge');
+    if (badge) {
+        badge.textContent = notificacoes.length;
+        badge.style.display = notificacoes.length > 0 ? 'flex' : 'none';
+    }
 
-    // Mostra ou esconde o banner do Dashboard conforme existam notificações
-    if (dashBanner) {
+    const alertBanner = document.getElementById('dashAlertBanner');
+    const alertText = document.getElementById('dashAlertText');
+    if (alertBanner && alertText) {
         if (notificacoes.length > 0) {
-            dashBanner.style.display = 'flex';
-            const partesResumo = [];
-            if (qtdCnh > 0) partesResumo.push(`${qtdCnh} motorista(s) com CNH em alerta/vencida`);
-            if (qtdVeiculos > 0) partesResumo.push(`${qtdVeiculos} pendência(s) de veículo/documentação`);
-            dashAlertText.textContent = partesResumo.join(' e ') + '.';
+            alertBanner.style.display = 'flex';
+            alertText.textContent = `${qtdMotoristas} motorista(s) com CNH em alerta/vencida e ${qtdVeiculos} pendência(s) de veículo/documentação.`;
         } else {
-            dashBanner.style.display = 'none';
+            alertBanner.style.display = 'none';
         }
     }
 
-    list.innerHTML = notificacoes.map(n => `
-        <div class="notif-item" onclick="navegarPara('${n.aba}')">
-            <strong>${n.titulo}</strong>
-            <span>${n.desc}</span>
-        </div>
-    `).join('') || '<p style="padding:10px; font-size:12px; color:var(--text-muted);">Sem alertas pendentes.</p>';
+    const listEl = document.getElementById('notifList');
+    if (listEl) {
+        if (notificacoes.length === 0) {
+            listEl.innerHTML = `<div class="notif-item"><p>Nenhuma pendência operacional no momento.</p></div>`;
+        } else {
+            listEl.innerHTML = notificacoes.map(n => `
+                <div class="notif-item" onclick="irParaNotificacao('${n.aba}')">
+                    <strong>${n.titulo}</strong>
+                    <p>${n.desc}</p>
+                </div>
+            `).join('');
+        }
+    }
 }
 
-// Abre o menu do sino quando o usuário clica em "Ver alertas ›" no banner
-function abrirNotificacoesPeloBanner(e) {
-    e.stopPropagation();
-    const notifDropdown = document.getElementById('notifDropdown');
-    notifDropdown.classList.add('open');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-// Auxiliar: Gera a lista dos últimos N meses a partir da data atual do computador e soma os gastos de manutenção
+// Auxiliares de Custos para os Gráficos
 function calcularCustosUltimosMeses(qtdMeses) {
     const nomesMeses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     const hoje = new Date();
@@ -487,35 +616,35 @@ function formatarValorCurto(val) {
     return `R$ ${val.toLocaleString('pt-BR')}`;
 }
 
-// 2. Dashboard (Sincronizado 100% com a aba Rotas e com faixas de horário elásticas)
+// 2. Dashboard
 function renderizarDashboard() {
-    // --- A) Frota ---
     const frotaEmpresa = state.veiculos.filter(v => v.status !== 'Vendido');
     const totalV = frotaEmpresa.length;
     const manutV = frotaEmpresa.filter(v => v.status === 'Em manutenção').length;
     const dispV = totalV - manutV;
     const pct = totalV > 0 ? Math.round((dispV / totalV) * 100) : 0;
 
-    document.getElementById('dashVeiculosDisp').textContent = `${dispV} de ${totalV}`;
-    document.getElementById('dashVeiculosManut').textContent = `${manutV} veículos em manutenção`;
-    document.getElementById('dashSitFrota').textContent = `Situação atual dos ${totalV} veículos`;
-    document.getElementById('dashDonutPct').textContent = `${pct}%`;
-    document.getElementById('dashDonutRing').style.background = `conic-gradient(var(--success) 0% ${pct}%, #E2E8F0 ${pct}% 100%)`;
-    document.getElementById('dashLegDisp').textContent = dispV;
-    document.getElementById('dashLegManut').textContent = manutV;
+    const setEl = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
 
-    // --- B) KPI Rotas Hoje (Idêntico à aba Rotas: soma Em andamento + Agendadas) ---
+    setEl('dashVeiculosDisp', `${dispV} de ${totalV}`);
+    setEl('dashVeiculosManut', `${manutV} veículos em manutenção`);
+    setEl('dashSitFrota', `Situação atual dos ${totalV} veículos`);
+    setEl('dashDonutPct', `${pct}%`);
+    const ringEl = document.getElementById('dashDonutRing');
+    if (ringEl) ringEl.style.background = `conic-gradient(var(--success) 0% ${pct}%, #E2E8F0 ${pct}% 100%)`;
+    setEl('dashLegDisp', dispV);
+    setEl('dashLegManut', manutV);
+
+    // KPI Rotas Hoje
     const rotasAtivas = state.rotas.filter(r => r.status !== 'Finalizada');
     const qtdAndamento = rotasAtivas.filter(r => r.status === 'Em andamento').length;
     const qtdAgendadas = rotasAtivas.filter(r => r.status === 'Agendada').length;
-    const totalHoje = rotasAtivas.length; // Bate exatamente com o "Rotas hoje: 3" da aba Rotas!
+    const totalHoje = rotasAtivas.length;
 
-    const elRotasHoje = document.getElementById('dashRotasHoje');
-    const elRotasSub = document.getElementById('dashRotasSub');
-    if (elRotasHoje) elRotasHoje.textContent = `${totalHoje} ${totalHoje === 1 ? 'rota' : 'rotas'}`;
-    if (elRotasSub) elRotasSub.textContent = `${qtdAndamento} em andamento · ${qtdAgendadas} agendada${qtdAgendadas !== 1 ? 's' : ''}`;
+    setEl('dashRotasHoje', `${totalHoje} ${totalHoje === 1 ? 'rota' : 'rotas'}`);
+    setEl('dashRotasSub', `${qtdAndamento} em andamento · ${qtdAgendadas} agendada${qtdAgendadas !== 1 ? 's' : ''}`);
 
-    // --- C) Gráfico de Distribuição das Rotas (Refinado: Fusão de faixas de pico e foco em Em andamento) ---
+    // Gráfico de Distribuição das Rotas
     const faixas = [
         { idx: 0, iniPadrao: 6, fimPadrao: 9, minHora: null, maxHora: null, qtd: 0, qtdAndamento: 0 },
         { idx: 1, iniPadrao: 9, fimPadrao: 12, minHora: null, maxHora: null, qtd: 0, qtdAndamento: 0 },
@@ -537,26 +666,19 @@ function renderizarDashboard() {
         else idx = 4;
 
         faixas[idx].qtd++;
-        if (r.status === 'Em andamento') {
-            faixas[idx].qtdAndamento++;
-        }
+        if (r.status === 'Em andamento') faixas[idx].qtdAndamento++;
         if (faixas[idx].minHora === null || hora < faixas[idx].minHora) faixas[idx].minHora = hora;
         if (faixas[idx].maxHora === null || hora > faixas[idx].maxHora) faixas[idx].maxHora = hora;
     });
 
     const barsContainer = document.getElementById('dashRouteBars');
     const peakEl = document.getElementById('dashRoutePeak');
-    const activeCountEl = document.getElementById('dashRouteActiveCount');
-
-    if (activeCountEl) {
-        activeCountEl.textContent = `• ${qtdAndamento} em andamento`;
-    }
+    setEl('dashRouteActiveCount', `• ${qtdAndamento} em andamento`);
 
     if (barsContainer) {
         const maiorQtdTotal = Math.max(...faixas.map(f => f.qtd), 1);
         const maiorQtdAndamento = Math.max(...faixas.map(f => f.qtdAndamento), 0);
 
-        // Prepara os limites reais de cada faixa (ex: 05-09 se houver rota às 05h)
         faixas.forEach(f => {
             f.iniReal = (f.minHora !== null && f.minHora < f.iniPadrao) ? f.minHora : f.iniPadrao;
             f.fimReal = (f.maxHora !== null && f.maxHora > f.fimPadrao) ? f.maxHora : f.fimPadrao;
@@ -565,7 +687,6 @@ function renderizarDashboard() {
             f.labelDinamico = `${f.iniStr}–${f.fimStr}`;
         });
 
-        // Define quais faixas representam o Pico (prioriza as rotas "Em andamento" se houver alguma)
         const criterioPico = maiorQtdAndamento > 0
             ? (f => f.qtdAndamento === maiorQtdAndamento)
             : (f => f.qtd > 0 && f.qtd === maiorQtdTotal);
@@ -590,24 +711,16 @@ function renderizarDashboard() {
             if (faixasDePico.length === 0) {
                 peakEl.textContent = 'Sem rotas ativas programadas';
             } else if (faixasDePico.length === 1) {
-                // Apenas 1 faixa de pico (ex: "Pico entre 09h e 12h")
                 peakEl.textContent = `Pico entre ${faixasDePico[0].iniStr}h e ${faixasDePico[0].fimStr}h`;
             } else {
-                // Verifica se as faixas empatadas são vizinhas/contínuas (ex: 09-12 e 12-15 -> junta em "09h e 15h")
                 const primeira = faixasDePico[0];
                 const ultima = faixasDePico[faixasDePico.length - 1];
-                const saoContinuas = (ultima.idx - primeira.idx) === (faixasDePico.length - 1);
-
-                if (saoContinuas) {
-                    peakEl.textContent = `Pico entre ${primeira.iniStr}h e ${ultima.fimStr}h`;
-                } else {
-                    // Se forem separadas (ex: manhã e noite), mostra o intervalo abrangente das rotas de pico
-                    peakEl.textContent = `Pico entre ${primeira.iniStr}h e ${ultima.fimStr}h`;
-                }
+                peakEl.textContent = `Pico entre ${primeira.iniStr}h e ${ultima.fimStr}h`;
             }
         }
     }
-    // --- D) Custos dos últimos 4 meses dinâmicos ---
+
+    // Custos dos últimos 4 meses
     const ultimos4 = calcularCustosUltimosMeses(4);
     const maiorValor = Math.max(...ultimos4.map(m => m.valor), 1);
 
@@ -630,76 +743,88 @@ function renderizarDashboard() {
 
     const totalGasto = state.manutencoes.reduce((acc, m) => acc + Number(m.custo || 0), 0);
     const gastoFormatado = `R$ ${totalGasto.toLocaleString('pt-BR')}`;
-    document.getElementById('dashGastoMes').textContent = gastoFormatado;
-    document.getElementById('dashFooterCusto').textContent = gastoFormatado;
+    setEl('dashGastoMes', gastoFormatado);
+    setEl('dashFooterCusto', gastoFormatado);
 }
 
-// 3. Frota de Veículos (Oculta "Vendido" em "Todos", exibindo apenas no filtro "Vendido")
+// 3. Frota de Veículos
 function renderizarFrota() {
+    const frotaAtiva = state.veiculos.filter(v => v.status !== 'Vendido');
+    const manut = frotaAtiva.filter(v => v.status === 'Em manutenção').length;
+    const disp = frotaAtiva.filter(v => v.status === 'Disponível' || v.status === 'Em rota').length;
+
+    const elTotal = document.getElementById('frotaTotalCount');
+    const elDisp = document.getElementById('frotaDispCount');
+    const elManut = document.getElementById('frotaManutCount');
+    if (elTotal) elTotal.textContent = frotaAtiva.length;
+    if (elDisp) elDisp.textContent = disp;
+    if (elManut) elManut.textContent = manut;
+
     const busca = (document.getElementById('searchFrota')?.value || '').toLowerCase();
-    const filtroStatus = document.getElementById('filterStatusFrota')?.value || 'Todos';
-
-    // Indicadores superiores contam apenas veículos da frota atual (não vendidos)
-    const frotaEmpresa = state.veiculos.filter(v => v.status !== 'Vendido');
-    const total = frotaEmpresa.length;
-    const manut = frotaEmpresa.filter(v => v.status === 'Em manutenção').length;
-    const disp = total - manut;
-
-    document.getElementById('frotaTotal').textContent = total;
-    document.getElementById('frotaDisp').textContent = disp;
-    document.getElementById('frotaManut').textContent = manut;
+    const statusFiltro = document.getElementById('filterStatusFrota')?.value || 'Todos';
 
     const filtrados = state.veiculos.filter(v => {
         const matchTexto = v.placa.toLowerCase().includes(busca) || v.modelo.toLowerCase().includes(busca);
-        
-        // Regra principal: "Todos" mostra apenas o que NÃO foi vendido.
-        // "Vendido" mostra exclusivamente os vendidos.
         let matchStatus = false;
-        if (filtroStatus === 'Todos') {
+        if (statusFiltro === 'Todos') {
             matchStatus = v.status !== 'Vendido';
         } else {
-            matchStatus = v.status === filtroStatus;
+            matchStatus = v.status === statusFiltro;
         }
-
         return matchTexto && matchStatus;
     });
 
     const mapBadge = {
         'Disponível': 'green',
-        'Em manutenção': 'orange',
         'Em rota': 'blue',
+        'Em manutenção': 'orange',
         'Inativo': 'gray',
         'Vendido': 'red'
     };
 
     const tbody = document.getElementById('tabelaFrotaBody');
-    if (filtrados.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding: 28px;">Nenhum veículo encontrado neste filtro.</td></tr>`;
-        return;
-    }
+    if (!tbody) return;
 
     tbody.innerHTML = filtrados.map(v => {
-        const proxVenc = obterProximoVencimentoVeiculo(v);
-        const regHtml = v.status === 'Vendido'
-            ? `<span style="color:var(--text-muted); font-size:12px;">Baixado / Vendido</span>`
-            : (proxVenc
-                ? `<div style="display:flex; align-items:center; gap:8px; cursor:pointer;" onclick="abrirModalControleVeiculo(${v.id})">
-                     <span style="background:#EFF6FF; color:#1D4ED8; padding:5px 7px; border-radius:6px; font-size:12px;">📅</span>
-                     <div style="line-height:1.2;">
-                         <small style="display:block; font-size:10.5px; color:var(--text-muted);">Próximo vencimento</small>
-                         <strong style="color:#1D4ED8; font-size:12px;">${formatarDataBR(proxVenc)}</strong>
-                     </div>
-                   </div>`
-                : `<button class="action-btn" onclick="abrirModalControleVeiculo(${v.id})">+ Adicionar</button>`);
+        const analise = analisarRegistrosVeiculo(v);
+        const docUrgente = analise.maisUrgente;
+
+        let celulaRegistros = `<button class="add-doc-btn" onclick="abrirModalRegistrosVeiculo(${v.id})">+ Adicionar</button>`;
+
+        if (docUrgente) {
+            let corTexto = '#1D4ED8';
+            let labelTopo = `Próximo vencimento (${docUrgente.nome})`;
+            let bgIcone = '#EFF6FF';
+
+            if (docUrgente.dias < 0) {
+                corTexto = '#DC2626';
+                labelTopo = `${docUrgente.nome} Vencido`;
+                bgIcone = '#FEE2E2';
+            } else if (docUrgente.dias <= 30) {
+                corTexto = '#D97706';
+                labelTopo = `Vence em ${docUrgente.dias}d (${docUrgente.nome})`;
+                bgIcone = '#FEF3C7';
+            }
+
+            celulaRegistros = `
+                <div class="doc-Expire" style="cursor:pointer;" onclick="abrirModalRegistrosVeiculo(${v.id})" title="Clique para ver IPVA, Licenciamento, SPVAT e SELO">
+                    <div class="doc-Expire-icon" style="background:${bgIcone};">🗓️</div>
+                    <div class="doc-Expire-text">
+                        <small style="${docUrgente.dias < 0 ? 'color:#DC2626; font-weight:700;' : ''}">${labelTopo}</small>
+                        <strong style="color:${corTexto};">${formatarDataBR(docUrgente.vencimento)}</strong>
+                    </div>
+                </div>
+            `;
+        }
 
         return `
             <tr>
                 <td><strong>${v.placa}</strong></td>
                 <td style="color:var(--text-muted);">${v.modelo}</td>
                 <td style="color:var(--text-muted);">${v.ano}</td>
-                <td style="color:var(--text-muted);">${v.capacidade}</td>
+                <td style="color:var(--text-muted);">${formatarCapacidadePassageiros(v.capacidade)}</td>
                 <td><span class="badge ${mapBadge[v.status] || 'gray'}">• ${v.status}</span></td>
-                <td>${regHtml}</td>
+                <td>${celulaRegistros}</td>
                 <td>
                     <button class="action-btn" onclick="abrirModalControleVeiculo(${v.id})">✎ Controle</button>
                 </td>
@@ -707,50 +832,87 @@ function renderizarFrota() {
         `;
     }).join('');
 }
-// 4. Motoristas
-function renderizarMotoristas() {
-    const busca = (document.getElementById('searchMotorista')?.value || '').toLowerCase();
 
-    let alertaCount = 0;
-    let vencidaCount = 0;
+// 4. Motoristas
+function obterStatusCNH(validadeISO) {
+    const dias = calcularDiasCNH(validadeISO);
+    if (dias < 0) {
+        return {
+            codigo: 'Vencida',
+            classe: 'red',
+            texto: `Vencida há ${Math.abs(dias)} dias`,
+            bloqueadoRota: true,
+            motivo: 'CNH Vencida'
+        };
+    } else if (dias <= 30) {
+        return {
+            codigo: 'Alerta',
+            classe: 'orange',
+            texto: `Vence em ${dias} dias`,
+            bloqueadoRota: true,
+            motivo: `CNH prestes a vencer (${dias} dias)`
+        };
+    }
+    return {
+        codigo: 'Regular',
+        classe: 'green',
+        texto: 'Regular',
+        bloqueadoRota: false,
+        motivo: ''
+    };
+}
+
+function renderizarMotoristas() {
+    let qtdAlerta = 0;
+    let qtdVencida = 0;
+
     state.motoristas.forEach(m => {
         const st = obterStatusCNH(m.validade);
-        if (st.codigo === 'Alerta') alertaCount++;
-        if (st.codigo === 'Vencida') vencidaCount++;
+        if (st.codigo === 'Alerta') qtdAlerta++;
+        if (st.codigo === 'Vencida') qtdVencida++;
     });
 
-    document.getElementById('motTotal').textContent = state.motoristas.length < 12 ? 12 : state.motoristas.length;
-    document.getElementById('motAlerta').textContent = alertaCount;
-    document.getElementById('motVencida').textContent = vencidaCount;
-    document.getElementById('motAttentionBadge').textContent = `• ${alertaCount + vencidaCount} habilitações requerem atenção`;
+    const setEl = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+    setEl('motTotalCount', state.motoristas.length);
+    setEl('motAlertaCount', qtdAlerta);
+    setEl('motVencidaCount', qtdVencida);
 
+    const pill = document.getElementById('motAttentionPill');
+    if (pill) {
+        const totalAtencao = qtdAlerta + qtdVencida;
+        pill.textContent = `• ${totalAtencao} habilitaç${totalAtencao === 1 ? 'ão requer' : 'ões requerem'} atenção`;
+        pill.style.display = totalAtencao > 0 ? 'inline-block' : 'none';
+    }
+
+    const busca = (document.getElementById('searchMotorista')?.value || '').toLowerCase();
     const filtrados = state.motoristas.filter(m =>
         m.nome.toLowerCase().includes(busca) || m.cnh.includes(busca)
     );
 
     const tbody = document.getElementById('tabelaMotoristasBody');
+    if (!tbody) return;
+
     tbody.innerHTML = filtrados.map(m => {
         const st = obterStatusCNH(m.validade);
-        const iniciais = m.nome.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase();
-        const corData = st.codigo !== 'Regular' ? 'color: #B91C1C; font-weight:700;' : 'color: var(--text-muted);';
-
         return `
-            <tr class="${st.rowClass}">
+            <tr>
                 <td>
-                    <span class="avatar-circle">${iniciais}</span>
                     <strong>${m.nome}</strong>
+                    <small style="display:block; color:var(--text-muted); font-size:11.5px;">${m.telefone}</small>
                 </td>
                 <td style="color:var(--text-muted);">${m.cnh}</td>
-                <td><span class="cat-pill">${m.categoria}</span></td>
-                <td style="${corData}">${formatarDataBR(m.validade)}</td>
-                <td><span class="badge ${st.classe}">${st.label}</span></td>
-                <td><button class="action-btn" onclick="abrirModalMotorista(${m.id})">✎ Editar</button></td>
+                <td><strong>Categoria ${m.categoria}</strong></td>
+                <td style="color:var(--text-muted);">${formatarDataBR(m.validade)}</td>
+                <td><span class="badge ${st.classe}">• ${st.texto}</span></td>
+                <td>
+                    <button class="action-btn" onclick="abrirModalMotorista(${m.id})">Editar</button>
+                </td>
             </tr>
         `;
     }).join('');
 }
 
-// 5. Clientes Corporativos (Oculta Inativos por padrão)
+// 5. Clientes Corporativos
 function renderizarClientes() {
     const busca = (document.getElementById('searchCliente')?.value || '').toLowerCase();
     const filtroStatus = document.getElementById('filterStatusCliente')?.value || 'Ativo';
@@ -766,6 +928,8 @@ function renderizarClientes() {
     });
 
     const grid = document.getElementById('clientesGrid');
+    if (!grid) return;
+
     if (filtrados.length === 0) {
         grid.innerHTML = `<div class="card" style="grid-column: 1 / -1; text-align:center; color:var(--text-muted); padding: 28px;">Nenhum cliente encontrado para este filtro.</div>`;
         return;
@@ -790,14 +954,15 @@ function renderizarClientes() {
     `).join('');
 }
 
-// 6. Rotas (Suporte completo a Agendada, Em andamento e Finalizada)
+// 6. Rotas
 function renderizarRotas() {
     const rotasNaoFinalizadas = state.rotas.filter(r => r.status !== 'Finalizada');
     const andamento = state.rotas.filter(r => r.status === 'Em andamento').length;
 
-    // Mostra o total de rotas ativas do dia (Em andamento + Agendadas)
-    document.getElementById('rotasTotalCount').textContent = rotasNaoFinalizadas.length;
-    document.getElementById('rotasAndamentoCount').textContent = andamento;
+    const elTotal = document.getElementById('rotasTotalCount');
+    const elAndamento = document.getElementById('rotasAndamentoCount');
+    if (elTotal) elTotal.textContent = rotasNaoFinalizadas.length;
+    if (elAndamento) elAndamento.textContent = andamento;
 
     const busca = (document.getElementById('searchRota')?.value || '').toLowerCase();
     const filtroStatus = document.getElementById('filterStatusRota')?.value || 'Ativas';
@@ -824,6 +989,8 @@ function renderizarRotas() {
     });
 
     const container = document.getElementById('listaRotasContainer');
+    if (!container) return;
+
     if (rotasFiltradas.length === 0) {
         container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding: 28px;">Nenhuma rota encontrada para este filtro.</div>`;
         return;
@@ -859,7 +1026,7 @@ function renderizarRotas() {
                     <div class="time-box">
                         <span style="color:var(--blue-light);">🕒</span>
                         <div>
-                            <small>Período ${r.periodo.toLowerCase()}</small>
+                            <small>Período ${(r.periodo || 'Manhã').toLowerCase()}</small>
                             <strong>${r.horaInicio}–${r.horaFim}</strong>
                         </div>
                     </div>
@@ -870,12 +1037,11 @@ function renderizarRotas() {
     }).join('');
 }
 
-// 7. Manutenções e Relatórios (Com Gráficos de 3 Meses e Categorias 100% Dinâmicos)
+// 7. Manutenções e Relatórios
+// 7. Manutenções e Relatórios
 function renderizarManutencoesERelatorios() {
     state.manutencoes.forEach((m, index) => {
-        if (!m.codigo) {
-            m.codigo = index + 1;
-        }
+        if (!m.codigo) m.codigo = index + 1;
     });
 
     const frotaEmpresa = state.veiculos.filter(v => v.status !== 'Vendido');
@@ -886,16 +1052,26 @@ function renderizarManutencoesERelatorios() {
     const qtdAbertos = state.manutencoes.filter(m => m.status !== 'Concluído').length;
     const totalServicosExibicao = state.manutencoes.length;
 
-    document.getElementById('manutGastoTotal').textContent = `R$ ${totalCusto.toLocaleString('pt-BR')}`;
-    document.getElementById('manutCustoMedio').textContent = `R$ ${custoMedio.toLocaleString('pt-BR')}`;
-    document.getElementById('manutQtdTotal').textContent = totalServicosExibicao;
-    document.getElementById('manutQtdSub').textContent = `${qtdConcluidos} concluídos · ${qtdAbertos} abertos`;
+    const textoSubServicos = `${qtdConcluidos} concluído${qtdConcluidos !== 1 ? 's' : ''} · ${qtdAbertos} aberto${qtdAbertos !== 1 ? 's' : ''}`;
 
-    document.getElementById('relGastoTotal').textContent = `R$ ${totalCusto.toLocaleString('pt-BR')}`;
-    document.getElementById('relCustoMedio').textContent = `R$ ${custoMedio.toLocaleString('pt-BR')}`;
-    document.getElementById('relServicosTotal').textContent = totalServicosExibicao;
+    const setEl = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
 
-    // 1. Gráfico Dinâmico: Evolução nos últimos 3 meses (Aba Relatórios)
+    // Atualiza cards da aba Manutenções
+    setEl('manutGastoTotal', `R$ ${totalCusto.toLocaleString('pt-BR')}`);
+    setEl('manutCustoMedio', `R$ ${custoMedio.toLocaleString('pt-BR')}`);
+    setEl('manutQtdTotal', totalServicosExibicao);
+    setEl('manutQtdSub', textoSubServicos);
+
+    // Atualiza cards da aba Relatórios (incluindo o subtítulo de concluídos e abertos)
+    setEl('relGastoTotal', `R$ ${totalCusto.toLocaleString('pt-BR')}`);
+    setEl('relCustoMedio', `R$ ${custoMedio.toLocaleString('pt-BR')}`);
+    setEl('relServicosTotal', totalServicosExibicao);
+    setEl('relServicosSub', textoSubServicos);
+
+    const cardRelServicos = document.getElementById('relServicosTotal')?.closest('.card');
+    const subRelEl = cardRelServicos?.querySelector('.kpi-sub');
+    if (subRelEl) subRelEl.textContent = textoSubServicos;
+
     const ultimos3 = calcularCustosUltimosMeses(3);
     const max3M = Math.max(...ultimos3.map(m => m.valor), 1);
     const container3M = document.getElementById('relCostPillars3M');
@@ -914,7 +1090,6 @@ function renderizarManutencoesERelatorios() {
         }).join('');
     }
 
-    // 2. Gráfico Dinâmico: Custos por Categoria (Inclui Pneus, Freios, Preventiva, Troca de óleo, Motor / marcha)
     const containerCat = document.getElementById('relCategoriasContainer');
     if (containerCat) {
         const mapaCores = {
@@ -957,7 +1132,6 @@ function renderizarManutencoesERelatorios() {
         }
     }
 
-    // 3. Filtros e Tabela de Histórico de Serviços
     const termoBusca = (document.getElementById('searchManutencao')?.value || '').trim().toLowerCase();
     const filtroStatus = document.getElementById('filterStatusManutencao')?.value || 'Pendentes';
 
@@ -984,7 +1158,6 @@ function renderizarManutencoesERelatorios() {
                     (m.obs && m.obs.toLowerCase().includes(termoBusca));
             }
         }
-
         return matchStatus && matchBusca;
     });
 
@@ -1019,10 +1192,11 @@ function renderizarManutencoesERelatorios() {
         }).join('');
     };
 
-    document.getElementById('tabelaManutencoesBody').innerHTML = gerarLinhasHTML(manutencoesFiltradas);
-    document.getElementById('tabelaRelatoriosBody').innerHTML = gerarLinhasHTML(state.manutencoes);
+    const tbManut = document.getElementById('tabelaManutencoesBody');
+    const tbRel = document.getElementById('tabelaRelatoriosBody');
+    if (tbManut) tbManut.innerHTML = gerarLinhasHTML(manutencoesFiltradas);
+    if (tbRel) tbRel.innerHTML = gerarLinhasHTML(state.manutencoes);
 
-    // 4. Resumo CNH no Relatório
     let reg = 0, alert = 0, venc = 0;
     state.motoristas.forEach(m => {
         const st = obterStatusCNH(m.validade);
@@ -1030,12 +1204,11 @@ function renderizarManutencoesERelatorios() {
         else if (st.codigo === 'Alerta') alert++;
         else venc++;
     });
-    document.getElementById('relCnhReg').textContent = `• ${reg} motoristas`;
-    document.getElementById('relCnhAlert').textContent = `• ${alert} motoristas`;
-    document.getElementById('relCnhVenc').textContent = `• ${venc} motorista${venc !== 1 ? 's' : ''}`;
+    setEl('relCnhReg', `• ${reg} motoristas`);
+    setEl('relCnhAlert', `• ${alert} motoristas`);
+    setEl('relCnhVenc', `• ${venc} motorista${venc !== 1 ? 's' : ''}`);
 }
 
-// Filtros em tempo real (Frota, Motoristas, Clientes, Rotas e Manutenções)
 function configurarFiltros() {
     document.getElementById('searchFrota')?.addEventListener('input', renderizarFrota);
     document.getElementById('filterStatusFrota')?.addEventListener('change', renderizarFrota);
@@ -1049,9 +1222,9 @@ function configurarFiltros() {
 }
 
 // ==================== MODAIS E CADASTROS ====================
-function abrirModal(titulo, htmlContent) {
+function abrirModal(titulo, conteudoHTML) {
     document.getElementById('modalTitle').textContent = titulo;
-    document.getElementById('modalBody').innerHTML = htmlContent;
+    document.getElementById('modalBody').innerHTML = conteudoHTML;
     document.getElementById('modalOverlay').classList.add('open');
 }
 
@@ -1059,74 +1232,209 @@ function fecharModal() {
     document.getElementById('modalOverlay').classList.remove('open');
 }
 
-// Modal: Novo Veículo
-function abrirModalVeiculo() {
-    abrirModal('Cadastrar Novo Veículo', `
+// 1. Modal de Cadastro de Novo Veículo
+function abrirModalNovoVeiculo() {
+    abrirModal('Adicionar Novo Veículo à Frota', `
         <form id="formNovoVeiculo">
             <div class="grid-2">
                 <div class="form-group">
-                    <label>Placa</label>
-                    <input type="text" id="vPlaca" placeholder="ABC-1D23" required>
+                    <label>Placa do Veículo</label>
+                    <input type="text" id="nvPlaca" placeholder="Ex: ABC-1D23" required>
                 </div>
                 <div class="form-group">
-                    <label>Ano</label>
-                    <input type="number" id="vAno" value="2024" required>
+                    <label>Ano de Fabricação</label>
+                    <input type="number" id="nvAno" value="2025" required>
                 </div>
             </div>
             <div class="form-group">
-                <label>Modelo</label>
-                <input type="text" id="vModelo" placeholder="Ex: Mercedes Sprinter 417" required>
+                <label>Marca / Modelo</label>
+                <input type="text" id="nvModelo" placeholder="Ex: Mercedes Sprinter 417" required>
             </div>
             <div class="grid-2">
                 <div class="form-group">
-                    <label>Capacidade</label>
-                    <input type="text" id="vCap" placeholder="16 passageiros" required>
+                    <label>Capacidade (Apenas números)</label>
+                    <input type="number" id="nvCapacidade" value="16" min="1" required>
                 </div>
                 <div class="form-group">
-                    <label>Status</label>
-                    <select id="vStatus">
+                    <label>Status Inicial</label>
+                    <select id="nvStatus">
                         <option value="Disponível">Disponível</option>
                         <option value="Em manutenção">Em manutenção</option>
-                        <option value="Em rota">Em rota</option>
                         <option value="Inativo">Inativo</option>
-                        <option value="Vendido">Vendido</option>
                     </select>
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>KM Inicial</label>
+                    <input type="number" id="nvKmAtual" value="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Vencimento Inicial (IPVA / Licenciamento)</label>
+                    <input type="date" id="nvCrlv" value="2027-05-15">
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
-                <button type="submit" class="btn-primary">Salvar veículo</button>
+                <button type="submit" class="btn-primary">Cadastrar Veículo</button>
             </div>
         </form>
     `);
 
     document.getElementById('formNovoVeiculo').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const kmInicial = Number(document.getElementById('nvKmAtual').value);
+        const dataInicial = document.getElementById('nvCrlv').value;
+        const numCap = obterNumeroCapacidade(document.getElementById('nvCapacidade').value);
+
         state.veiculos.push({
             id: Date.now(),
-            placa: document.getElementById('vPlaca').value.toUpperCase(),
-            modelo: document.getElementById('vModelo').value,
-            ano: Number(document.getElementById('vAno').value),
-            capacidade: document.getElementById('vCap').value,
-            status: document.getElementById('vStatus').value,
-            documentos: { ipva: { vencimento: '', valor: 0, obs: '' }, licenciamento: { vencimento: '', valor: 0, obs: '' }, spvat: { vencimento: '', valor: 0, obs: '' }, selo: { vencimento: '', valor: 0, obs: '' } },
-            km: { atual: 0, dataConferencia: '2026-09-28', proxTrocaOleo: 10000, obs: '' }
+            placa: document.getElementById('nvPlaca').value.toUpperCase().trim(),
+            modelo: document.getElementById('nvModelo').value.trim(),
+            ano: Number(document.getElementById('nvAno').value),
+            capacidade: `${numCap} passageiros`,
+            status: document.getElementById('nvStatus').value,
+            km: {
+                atual: kmInicial,
+                proxTrocaOleo: kmInicial + 10000,
+                ultimaAtualizacao: obterDataHojeISO()
+            },
+            registros: {
+                ipva: { vencimento: dataInicial, valor: '', obs: '' },
+                licenciamento: { vencimento: '', valor: '', obs: '' },
+                spvat: { vencimento: '', valor: '', obs: '' },
+                selo: { vencimento: '', valor: '', obs: '' }
+            }
         });
+
+        await verificarStatusRotasAutomatico(true);
         await salvarEstado();
         fecharModal();
         renderizarTudo();
     });
 }
 
-// 2. Modal Unificado de Controle do Veículo (Com Trava de Segurança contra Inativação/Venda se estiver em Rota)
+// 2. Modal "Detalhes de registros" (IPVA, Licenciamento, SPVAT e SELO)
+function abrirModalRegistrosVeiculo(id) {
+    const v = state.veiculos.find(item => item.id === id);
+    if (!v) return;
+
+    const reg = garantirEstruturaRegistros(v);
+
+    const montarBadgeStatusDoc = (dataISO) => {
+        if (!dataISO) return `<span class="badge gray" style="font-size:10.5px;">Opcional</span>`;
+        const dias = calcularDiasCNH(dataISO);
+        if (dias < 0) {
+            return `<span class="badge red" style="font-size:10.5px;">• Vencido há ${Math.abs(dias)}d (Inativa veículo)</span>`;
+        }
+        if (dias <= 30) {
+            return `<span class="badge orange" style="font-size:10.5px;">• Vence em ${dias === 0 ? 'hoje' : dias + ' dias'}</span>`;
+        }
+        return `<span class="badge green" style="font-size:10.5px;">• Em dia (${dias}d restantes)</span>`;
+    };
+
+    const blocos = [
+        { chave: 'ipva', titulo: 'IPVA', sub: 'Imposto sobre a propriedade do veículo', dados: reg.ipva },
+        { chave: 'licenciamento', titulo: 'Licenciamento', sub: 'Licenciamento anual do veículo', dados: reg.licenciamento },
+        { chave: 'spvat', titulo: 'SPVAT', sub: 'Seguro obrigatório do veículo', dados: reg.spvat },
+        { chave: 'selo', titulo: 'SELO', sub: 'Selo e identificação anual do veículo', dados: reg.selo }
+    ];
+
+    abrirModal(`Detalhes de registros`, `
+        <p style="font-size: 12.5px; color: var(--text-muted); margin-top: -10px; margin-bottom: 14px;">
+            ${v.modelo} · <strong>${v.placa}</strong>
+        </p>
+
+        <div style="display:flex; align-items:center; gap:12px; background:#EFF6FF; border:1px solid #BFDBFE; padding:12px 14px; border-radius:10px; margin-bottom:16px;">
+            <div style="width:34px; height:34px; border-radius:8px; background:#FFFFFF; display:flex; align-items:center; justify-content:center; font-size:16px;">🗓️</div>
+            <div>
+                <small style="display:block; font-size:11px; color:#3B82F6;">Documentos opcionais do veículo</small>
+                <strong style="font-size:13px; color:#1E3A8A;">Registros e vencimentos</strong>
+            </div>
+        </div>
+
+        <form id="formRegistrosVeiculo">
+            <div style="display:flex; flex-direction:column; gap:14px; max-height: 55vh; overflow-y: auto; padding-right: 4px;">
+                ${blocos.map(b => `
+                    <div style="border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--bg-card);">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 10px;">
+                            <div>
+                                <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 2px;">${b.titulo}</h4>
+                                <small style="font-size: 11.5px; color: var(--text-muted);">${b.sub}</small>
+                            </div>
+                            <div id="badge_${b.chave}">${montarBadgeStatusDoc(b.dados.vencimento)}</div>
+                        </div>
+
+                        <div class="grid-2" style="margin-bottom: 8px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="text-transform:none; font-size:11.5px;">Data de vencimento</label>
+                                <input type="date" id="reg_${b.chave}_data" value="${b.dados.vencimento || ''}">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="text-transform:none; font-size:11.5px;">Valor pago</label>
+                                <input type="text" id="reg_${b.chave}_valor" value="${b.dados.valor || ''}" placeholder="Ex: R$ 1.480,00">
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="text-transform:none; font-size:11.5px;">Observação</label>
+                            <input type="text" id="reg_${b.chave}_obs" value="${b.dados.obs || ''}" placeholder="Ex: Pagamento realizado em cota única.">
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+
+            <p style="font-size: 11px; color: var(--text-muted); margin-top: 12px; margin-bottom: 8px;">
+                Os registros são opcionais. O vencimento mais próximo ficará visível na tabela da frota e documentos vencidos tornam o veículo Inativo automaticamente.
+            </p>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+                <button type="submit" class="btn-primary">Salvar registros</button>
+            </div>
+        </form>
+    `);
+
+    blocos.forEach(b => {
+        const inputData = document.getElementById(`reg_${b.chave}_data`);
+        const badgeContainer = document.getElementById(`badge_${b.chave}`);
+        inputData.addEventListener('change', () => {
+            badgeContainer.innerHTML = montarBadgeStatusDoc(inputData.value);
+        });
+    });
+
+    document.getElementById('formRegistrosVeiculo').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        blocos.forEach(b => {
+            v.registros[b.chave] = {
+                vencimento: document.getElementById(`reg_${b.chave}_data`).value,
+                valor: document.getElementById(`reg_${b.chave}_valor`).value.trim(),
+                obs: document.getElementById(`reg_${b.chave}_obs`).value.trim()
+            };
+        });
+
+        const analiseNova = analisarRegistrosVeiculo(v);
+        if (!analiseNova.temVencido && v.status === 'Inativo') {
+            v.inativadoManualmente = false;
+            v.status = 'Disponível';
+        }
+
+        await verificarStatusRotasAutomatico(true);
+        await salvarEstado();
+        fecharModal();
+        renderizarTudo();
+    });
+}
+
+// 3. Modal de Controle do Veículo
 function abrirModalControleVeiculo(id) {
     const v = state.veiculos.find(item => item.id === id);
     if (!v) return;
 
-    const docs = v.docs || { crlv: '', seguro: '', tacografo: '', revisao: '' };
-    const km = v.km || { atual: 10000, proxTrocaOleo: 20000, ultimaAtualizacao: '2026-09-28' };
+    const km = v.km || { atual: 10000, proxTrocaOleo: 20000, ultimaAtualizacao: obterDataHojeISO() };
+    const capNumero = obterNumeroCapacidade(v.capacidade);
 
-    // Verifica se o veículo está preso em alguma rota ativa (Em andamento ou Agendada)
     const rotaVinculada = state.rotas.find(r => Number(r.veiculoId) === v.id && r.status !== 'Finalizada');
     const clienteRota = rotaVinculada ? state.clientes.find(c => c.id === Number(rotaVinculada.clienteId)) : null;
 
@@ -1157,7 +1465,7 @@ function abrirModalControleVeiculo(id) {
                     </div>
                     <div class="form-group" style="margin-bottom:0;">
                         <label>Capacidade (Passageiros)</label>
-                        <input type="number" id="ctrlCap" value="${v.capacidade}" required>
+                        <input type="number" id="ctrlCap" value="${capNumero}" min="1" required>
                     </div>
                 </div>
             </div>
@@ -1176,28 +1484,9 @@ function abrirModalControleVeiculo(id) {
                 </div>
             </div>
 
-            <div style="background: var(--bg-body); padding: 12px 14px; border-radius: 10px; margin-bottom: 12px; border: 1px solid var(--border);">
-                <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">3. Vencimentos de Documentação</label>
-                <div class="grid-2" style="margin-top: 8px; margin-bottom: 0;">
-                    <div class="form-group" style="margin-bottom:8px;">
-                        <label>Licenciamento / CRLV</label>
-                        <input type="date" id="ctrlCrlv" value="${docs.crlv}">
-                    </div>
-                    <div class="form-group" style="margin-bottom:8px;">
-                        <label>Seguro da Frota</label>
-                        <input type="date" id="ctrlSeguro" value="${docs.seguro}">
-                    </div>
-                </div>
-                <div class="grid-2" style="margin-bottom: 0;">
-                    <div class="form-group" style="margin-bottom:0;">
-                        <label>Aferição do Tacógrafo</label>
-                        <input type="date" id="ctrlTacografo" value="${docs.tacografo}">
-                    </div>
-                    <div class="form-group" style="margin-bottom:0;">
-                        <label>Revisão Preventiva</label>
-                        <input type="date" id="ctrlRevisao" value="${docs.revisao}">
-                    </div>
-                </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; background:#EFF6FF; padding:10px 14px; border-radius:10px; margin-bottom:12px; border:1px solid #BFDBFE;">
+                <span style="font-size:12px; color:#1E3A8A; font-weight:600;">Deseja editar IPVA, Licenciamento, SPVAT ou SELO?</span>
+                <button type="button" class="action-btn" style="color:#1D4ED8; font-weight:700;" onclick="abrirModalRegistrosVeiculo(${v.id})">Abrir Registros ›</button>
             </div>
 
             <p class="error-msg" id="veiculoBlockError" style="display:none;"></p>
@@ -1215,47 +1504,44 @@ function abrirModalControleVeiculo(id) {
         const errEl = document.getElementById('veiculoBlockError');
         errEl.style.display = 'none';
 
-        // TRAVA DE PRODUÇÃO 1: Impede inativar, vender ou colocar em manutenção se o veículo estiver em uma rota ativa
-        if (rotaVinculada && ['Inativo', 'Vendido', 'Em manutenção'].includes(novoStatus)) {
-            const nomeCli = clienteRota ? clienteRota.empresa : 'Cliente';
-            errEl.textContent = `Ação bloqueada: Este veículo está vinculado à rota ativa (${rotaVinculada.status}) de "${nomeCli}". Altere o veículo da rota ou finalize-a antes de mudar para ${novoStatus}.`;
+        const analiseDoc = analisarRegistrosVeiculo(v);
+
+        if (analiseDoc.temVencido && novoStatus !== 'Inativo' && novoStatus !== 'Vendido') {
+            const nomesVencidos = analiseDoc.vencidos.map(d => `${d.nome} (${formatarDataBR(d.vencimento)})`).join(', ');
+            errEl.textContent = `Veículo bloqueado: Há documento(s) vencido(s) [${nomesVencidos}]. Clique em "Abrir Registros" acima e atualize a data de vencimento para reativar o veículo.`;
             errEl.style.display = 'block';
             return;
         }
 
-        // TRAVA DE PRODUÇÃO 2: Não permite marcar manualmente "Disponível" se ele está "Em andamento" numa rota agora
-        if (rotaVinculada && rotaVinculada.status === 'Em andamento' && novoStatus !== 'Em rota') {
-            errEl.textContent = `Ação bloqueada: O veículo está realizando uma viagem "Em andamento" neste momento e seu status deve permanecer "Em rota".`;
+        if (rotaVinculada && ['Inativo', 'Vendido', 'Em manutenção'].includes(novoStatus)) {
+            const nomeCli = clienteRota ? clienteRota.empresa : 'Cliente';
+            errEl.textContent = `Ação bloqueada: Este veículo está vinculado à rota ativa (${rotaVinculada.status}) de "${nomeCli}". Altere o veículo da rota ou finalize-a antes.`;
             errEl.style.display = 'block';
             return;
         }
+
+        const numCap = obterNumeroCapacidade(document.getElementById('ctrlCap').value);
 
         v.modelo = document.getElementById('ctrlModelo').value.trim();
         v.status = novoStatus;
+        v.inativadoManualmente = (novoStatus === 'Inativo');
         v.ano = Number(document.getElementById('ctrlAno').value);
-        v.capacidade = Number(document.getElementById('ctrlCap').value);
+        v.capacidade = `${numCap} passageiros`;
 
         v.km = {
             atual: Number(document.getElementById('ctrlKmAtual').value),
             proxTrocaOleo: Number(document.getElementById('ctrlKmOleo').value),
-            ultimaAtualizacao: typeof obterDataHojeISO === 'function' ? obterDataHojeISO() : '2026-11-11'
+            ultimaAtualizacao: obterDataHojeISO()
         };
 
-        v.docs = {
-            crlv: document.getElementById('ctrlCrlv').value,
-            seguro: document.getElementById('ctrlSeguro').value,
-            tacografo: document.getElementById('ctrlTacografo').value,
-            revisao: document.getElementById('ctrlRevisao').value
-        };
-
-        await verificarStatusRotasAutomatico();
+        await verificarStatusRotasAutomatico(true);
         await salvarEstado();
         fecharModal();
         renderizarTudo();
     });
 }
 
-// Modal: Motorista (Com trava se estiver em rota ativa)
+// 4. Modal: Motorista
 function abrirModalMotorista(id = null) {
     const m = state.motoristas.find(item => item.id === id) || {
         nome: '', telefone: '', cnh: '', categoria: 'D', validade: '2028-05-10'
@@ -1316,7 +1602,7 @@ function abrirModalMotorista(id = null) {
     });
 }
 
-// Modal: Cliente Corporativo (Com Trava para impedir inativar cliente com rota ativa)
+// 5. Modal: Cliente Corporativo
 function abrirModalCliente(id = null) {
     const c = state.clientes.find(item => item.id === id) || {
         empresa: '', contato: '', telefone: '', rotasRealizadas: 0, status: 'Ativo'
@@ -1367,7 +1653,6 @@ function abrirModalCliente(id = null) {
         const errEl = document.getElementById('clienteBlockError');
         errEl.style.display = 'none';
 
-        // TRAVA DE PRODUÇÃO: Impede inativar cliente que possui rota ativa
         if (rotaAtivaDoCliente && novoStatus === 'Inativo') {
             errEl.textContent = `Ação bloqueada: Este cliente possui uma rota ativa (${rotaAtivaDoCliente.status}). Finalize a rota na aba Rotas antes de inativar o contrato do cliente.`;
             errEl.style.display = 'block';
@@ -1396,7 +1681,7 @@ function abrirModalCliente(id = null) {
     });
 }
 
-// Modal: Rotas (Filtra apenas veículos da Frota Atual que estejam Disponíveis e sem conflito de horário)
+// 6. Modal: Rotas
 function abrirModalRota(id = null) {
     const clientePadrao = state.clientes.find(c => c.status === 'Ativo') || state.clientes[0];
 
@@ -1404,19 +1689,17 @@ function abrirModalRota(id = null) {
         clienteId: clientePadrao ? clientePadrao.id : 1,
         veiculoId: '',
         motoristaId: '',
-        data: typeof obterDataHojeISO === 'function' ? obterDataHojeISO() : '2026-11-11',
+        data: obterDataHojeISO(),
         periodo: 'Manhã',
         horaInicio: '08:00',
         horaFim: '10:00',
         status: 'Agendada'
     };
 
-    // Veículos ocupados em OUTRAS rotas não finalizadas
     const veiculosOcupadosEmOutrasRotas = state.rotas
         .filter(rota => rota.id !== id && rota.status !== 'Finalizada')
         .map(rota => Number(rota.veiculoId));
 
-    // Exibe apenas veículos da Frota Atual (Disponíveis e não ocupados em outra rota, ou o próprio veículo já vinculado a esta rota)
     const veiculosElegiveis = state.veiculos.filter(v => {
         if (v.status === 'Vendido' || v.status === 'Inativo' || v.status === 'Em manutenção') return false;
         const ehOVeiculoDestaRota = id && Number(v.id) === Number(r.veiculoId);
@@ -1523,7 +1806,6 @@ function abrirModalRota(id = null) {
             return;
         }
 
-        // Conflito de motorista no mesmo horário em outra rota ativa
         const conflitoMotorista = state.rotas.find(outra => {
             if (outra.id === id || outra.status === 'Finalizada') return false;
             if (Number(outra.motoristaId) !== motoristaId) return false;
@@ -1550,17 +1832,17 @@ function abrirModalRota(id = null) {
         if (id) Object.assign(r, dados);
         else state.rotas.unshift({ id: Date.now(), ...dados });
 
-        await verificarStatusRotasAutomatico();
+        await verificarStatusRotasAutomatico(true);
         await salvarEstado();
         fecharModal();
         renderizarTudo();
     });
 }
 
-// Modal: Registrar ou Editar Serviço de Manutenção (Com Status Automático por Data e Sincronização com Frota)
+// 7. Modal: Manutenção
 function abrirModalManutencao(id = null) {
     const editando = id !== null;
-    const hojeISO = typeof obterDataHojeISO === 'function' ? obterDataHojeISO() : '2026-11-11';
+    const hojeISO = obterDataHojeISO();
 
     const m = state.manutencoes.find(item => item.id === id) || {
         placa: state.veiculos.find(v => v.status !== 'Vendido')?.placa || state.veiculos[0].placa,
@@ -1572,7 +1854,6 @@ function abrirModalManutencao(id = null) {
         status: 'Em andamento'
     };
 
-    // Filtra apenas veículos da Frota Atual (não vendidos) para o select
     const veiculosFrotaAtual = state.veiculos.filter(v => v.status !== 'Vendido' || v.placa === m.placa);
 
     abrirModal(editando ? `Editar Serviço #${m.codigo || ''} (${m.placa})` : 'Registrar Serviço de Manutenção', `
@@ -1634,9 +1915,6 @@ function abrirModalManutencao(id = null) {
     const inputData = document.getElementById('manData');
     const selectStatus = document.getElementById('manStatus');
 
-    // Quando o usuário muda a data no calendário:
-    // - Se colocar data futura (ex: amanhã 12/11/2026), muda automaticamente para "Agendado"
-    // - Se colocar a data de hoje e estava "Agendado", muda automaticamente para "Em andamento"
     inputData.addEventListener('change', () => {
         const dataEscolhida = inputData.value;
         if (!dataEscolhida) return;
@@ -1657,7 +1935,6 @@ function abrirModalManutencao(id = null) {
         const dataEscolhida = inputData.value;
         let status = selectStatus.value;
 
-        // Garante a regra: se a data é futura e o usuário não marcou como Concluído, fica Agendado
         if (dataEscolhida > hojeISO && status !== 'Concluído') {
             status = 'Agendado';
         } else if (dataEscolhida <= hojeISO && status === 'Agendado') {
@@ -1666,7 +1943,6 @@ function abrirModalManutencao(id = null) {
 
         const veiculo = state.veiculos.find(v => v.placa === placa);
 
-        // Trava: se a manutenção vai entrar "Em andamento" hoje, verifica se o veículo está rodando em uma rota "Em andamento" agora
         if (status === 'Em andamento' && veiculo) {
             const rotaRodandoAgora = state.rotas.find(r => Number(r.veiculoId) === veiculo.id && r.status === 'Em andamento');
             if (rotaRodandoAgora) {
@@ -1698,8 +1974,7 @@ function abrirModalManutencao(id = null) {
             });
         }
 
-        // Sincroniza imediatamente o status da manutenção e do veículo na Frota
-        await verificarStatusRotasAutomatico();
+        await verificarStatusRotasAutomatico(true);
         await salvarEstado();
         fecharModal();
         renderizarTudo();
