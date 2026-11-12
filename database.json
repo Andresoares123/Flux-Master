@@ -603,7 +603,8 @@
       "cnh": "08945123760",
       "categoria": "D",
       "validade": "2028-08-18",
-      "telefone": "389999999"
+      "telefone": "389999999",
+      "status": "Ativo"
     },
     {
       "id": 2,
@@ -611,7 +612,8 @@
       "cnh": "05478321908",
       "categoria": "D",
       "validade": "2027-01-15",
-      "telefone": "38999998"
+      "telefone": "38999998",
+      "status": "Ativo"
     },
     {
       "id": 3,
@@ -619,7 +621,8 @@
       "cnh": "07321654892",
       "categoria": "E",
       "validade": "2027-01-21",
-      "telefone": "389945612"
+      "telefone": "389945612",
+      "status": "Ativo"
     },
     {
       "id": 4,
@@ -627,7 +630,8 @@
       "cnh": "09123654788",
       "categoria": "D",
       "validade": "2029-05-24",
-      "telefone": "3899999"
+      "telefone": "3899999",
+      "status": "Ativo"
     },
     {
       "id": 5,
@@ -635,7 +639,8 @@
       "cnh": "04652139877",
       "categoria": "D",
       "validade": "2027-11-05",
-      "telefone": "3899999999"
+      "telefone": "3899999999",
+      "status": "Inativo"
     }
   ],
   "clientes": [
@@ -728,7 +733,7 @@
       "id": 3,
       "clienteId": 3,
       "veiculoId": 4,
-      "motoristaId": 1,
+      "motoristaId": 3,
       "data": "2026-11-12",
       "periodo": "Tarde",
       "horaInicio": "11:32",

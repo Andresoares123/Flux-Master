@@ -500,12 +500,16 @@ function renderizarTudo() {
 }
 
 // 1. Notificações Automáticas
+// 1. Notificações Automáticas (Apenas motoristas Ativos e veículos não vendidos)
 function renderizarNotificacoes() {
     const notificacoes = [];
     let qtdMotoristas = 0;
     let qtdVeiculos = 0;
 
     state.motoristas.forEach(m => {
+        if (!m.status) m.status = 'Ativo';
+        if (m.status === 'Inativo') return; // Motorista desligado não gera alerta de CNH
+
         const st = obterStatusCNH(m.validade);
         if (st.codigo !== 'Regular') {
             qtdMotoristas++;
@@ -747,7 +751,7 @@ function renderizarDashboard() {
     setEl('dashFooterCusto', gastoFormatado);
 }
 
-// 3. Frota de Veículos
+// 3. Frota de Veículos (Com design refinado na coluna REGISTROS e botão + Adicionar)
 function renderizarFrota() {
     const frotaAtiva = state.veiculos.filter(v => v.status !== 'Vendido');
     const manut = frotaAtiva.filter(v => v.status === 'Em manutenção').length;
@@ -789,29 +793,51 @@ function renderizarFrota() {
         const analise = analisarRegistrosVeiculo(v);
         const docUrgente = analise.maisUrgente;
 
-        let celulaRegistros = `<button class="add-doc-btn" onclick="abrirModalRegistrosVeiculo(${v.id})">+ Adicionar</button>`;
+        // Botão "+ Adicionar" moderno em formato de pílula com borda suave e efeito hover
+        let celulaRegistros = `
+            <button type="button" onclick="abrirModalRegistrosVeiculo(${v.id})"
+                style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; border: 1px dashed #CBD5E1; background: var(--bg-body); color: var(--text-main); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;"
+                onmouseover="this.style.borderColor='#3B82F6'; this.style.color='#1D4ED8'; this.style.background='#EFF6FF';"
+                onmouseout="this.style.borderColor='#CBD5E1'; this.style.color='var(--text-main)'; this.style.background='var(--bg-body)';"
+                title="Adicionar IPVA, Licenciamento, SPVAT ou SELO">
+                <span style="display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:4px; background:#DBEAFE; color:#1D4ED8; font-size:13px; font-weight:700; line-height:1;">+</span>
+                Adicionar
+            </button>
+        `;
 
         if (docUrgente) {
-            let corTexto = '#1D4ED8';
-            let labelTopo = `Próximo vencimento (${docUrgente.nome})`;
+            let corData = '#1D4ED8';
+            let corSub = 'var(--text-muted)';
+            let labelTopo = `Próximo (${docUrgente.nome})`;
             let bgIcone = '#EFF6FF';
+            let bordaCard = 'transparent';
 
             if (docUrgente.dias < 0) {
-                corTexto = '#DC2626';
+                corData = '#DC2626';
+                corSub = '#DC2626';
                 labelTopo = `${docUrgente.nome} Vencido`;
                 bgIcone = '#FEE2E2';
+                bordaCard = '#FECACA';
             } else if (docUrgente.dias <= 30) {
-                corTexto = '#D97706';
+                corData = '#D97706';
+                corSub = '#B45309';
                 labelTopo = `Vence em ${docUrgente.dias}d (${docUrgente.nome})`;
                 bgIcone = '#FEF3C7';
+                bordaCard = '#FDE68A';
             }
 
             celulaRegistros = `
-                <div class="doc-Expire" style="cursor:pointer;" onclick="abrirModalRegistrosVeiculo(${v.id})" title="Clique para ver IPVA, Licenciamento, SPVAT e SELO">
-                    <div class="doc-Expire-icon" style="background:${bgIcone};">🗓️</div>
-                    <div class="doc-Expire-text">
-                        <small style="${docUrgente.dias < 0 ? 'color:#DC2626; font-weight:700;' : ''}">${labelTopo}</small>
-                        <strong style="color:${corTexto};">${formatarDataBR(docUrgente.vencimento)}</strong>
+                <div onclick="abrirModalRegistrosVeiculo(${v.id})"
+                    style="display: inline-flex; align-items: center; gap: 10px; padding: 4px 10px 4px 4px; border-radius: 8px; border: 1px solid ${bordaCard}; cursor: pointer; transition: background 0.2s;"
+                    onmouseover="this.style.background='var(--bg-body)'"
+                    onmouseout="this.style.background='transparent'"
+                    title="Clique para gerenciar IPVA, Licenciamento, SPVAT e SELO">
+                    <div style="width: 32px; height: 32px; border-radius: 8px; background: ${bgIcone}; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0;">
+                        🗓️
+                    </div>
+                    <div style="display: flex; flex-direction: column; line-height: 1.25; text-align: left;">
+                        <small style="font-size: 11px; color: ${corSub}; font-weight: ${docUrgente.dias < 0 ? '700' : '500'};">${labelTopo}</small>
+                        <strong style="font-size: 12.5px; color: ${corData}; font-weight: 700;">${formatarDataBR(docUrgente.vencimento)}</strong>
                     </div>
                 </div>
             `;
@@ -863,17 +889,40 @@ function obterStatusCNH(validadeISO) {
 }
 
 function renderizarMotoristas() {
+    // Garante que todos os motoristas existentes tenham o campo status ("Ativo" por padrão)
+    state.motoristas.forEach(m => {
+        if (!m.status) m.status = 'Ativo';
+    });
+
+    // Garante que o select de filtro exista na barra mesmo se o HTML não tiver sido editado
+    const inputBuscaEl = document.getElementById('searchMotorista');
+    const filterBar = inputBuscaEl?.closest('.filter-bar');
+    if (filterBar && !document.getElementById('filterStatusMotorista')) {
+        const selectHTML = document.createElement('select');
+        selectHTML.id = 'filterStatusMotorista';
+        selectHTML.className = 'filter-select';
+        selectHTML.innerHTML = `
+            <option value="Ativo">Apenas Ativos (Ocultar inativos)</option>
+            <option value="Inativo">Apenas Inativos</option>
+            <option value="Todos">Todos os motoristas</option>
+        `;
+        selectHTML.addEventListener('change', renderizarMotoristas);
+        filterBar.appendChild(selectHTML);
+    }
+
+    // Os KPIs do topo contabilizam apenas os motoristas Ativos na empresa
+    const motoristasAtivos = state.motoristas.filter(m => m.status === 'Ativo');
     let qtdAlerta = 0;
     let qtdVencida = 0;
 
-    state.motoristas.forEach(m => {
+    motoristasAtivos.forEach(m => {
         const st = obterStatusCNH(m.validade);
         if (st.codigo === 'Alerta') qtdAlerta++;
         if (st.codigo === 'Vencida') qtdVencida++;
     });
 
     const setEl = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
-    setEl('motTotalCount', state.motoristas.length);
+    setEl('motTotalCount', motoristasAtivos.length);
     setEl('motAlertaCount', qtdAlerta);
     setEl('motVencidaCount', qtdVencida);
 
@@ -885,25 +934,44 @@ function renderizarMotoristas() {
     }
 
     const busca = (document.getElementById('searchMotorista')?.value || '').toLowerCase();
-    const filtrados = state.motoristas.filter(m =>
-        m.nome.toLowerCase().includes(busca) || m.cnh.includes(busca)
-    );
+    const filtroStatus = document.getElementById('filterStatusMotorista')?.value || 'Ativo';
+
+    const filtrados = state.motoristas.filter(m => {
+        const matchTexto = m.nome.toLowerCase().includes(busca) || m.cnh.includes(busca);
+        const matchStatus = filtroStatus === 'Todos' ? true : m.status === filtroStatus;
+        return matchTexto && matchStatus;
+    });
 
     const tbody = document.getElementById('tabelaMotoristasBody');
     if (!tbody) return;
 
+    if (filtrados.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding: 28px;">Nenhum motorista encontrado para este filtro.</td></tr>`;
+        return;
+    }
+
     tbody.innerHTML = filtrados.map(m => {
         const st = obterStatusCNH(m.validade);
+        const isInativo = m.status === 'Inativo';
+        const badgeInativo = isInativo
+            ? `<span class="badge gray" style="margin-left: 6px; font-size: 10.5px;">• Inativo</span>`
+            : '';
+
         return `
-            <tr>
+            <tr style="${isInativo ? 'opacity: 0.72;' : ''}">
                 <td>
-                    <strong>${m.nome}</strong>
+                    <strong>${m.nome}</strong>${badgeInativo}
                     <small style="display:block; color:var(--text-muted); font-size:11.5px;">${m.telefone}</small>
                 </td>
                 <td style="color:var(--text-muted);">${m.cnh}</td>
                 <td><strong>Categoria ${m.categoria}</strong></td>
                 <td style="color:var(--text-muted);">${formatarDataBR(m.validade)}</td>
-                <td><span class="badge ${st.classe}">• ${st.texto}</span></td>
+                <td>
+                    ${isInativo
+                        ? `<span class="badge gray">• Inativo (${st.texto})</span>`
+                        : `<span class="badge ${st.classe}">• ${st.texto}</span>`
+                    }
+                </td>
                 <td>
                     <button class="action-btn" onclick="abrirModalMotorista(${m.id})">Editar</button>
                 </td>
@@ -1198,14 +1266,14 @@ function renderizarManutencoesERelatorios() {
     if (tbRel) tbRel.innerHTML = gerarLinhasHTML(state.manutencoes);
 
     let reg = 0, alert = 0, venc = 0;
-    state.motoristas.forEach(m => {
+    state.motoristas.filter(m => m.status !== 'Inativo').forEach(m => {
         const st = obterStatusCNH(m.validade);
         if (st.codigo === 'Regular') reg++;
         else if (st.codigo === 'Alerta') alert++;
         else venc++;
     });
-    setEl('relCnhReg', `• ${reg} motoristas`);
-    setEl('relCnhAlert', `• ${alert} motoristas`);
+    setEl('relCnhReg', `• ${reg} motorista${reg !== 1 ? 's' : ''}`);
+    setEl('relCnhAlert', `• ${alert} motorista${alert !== 1 ? 's' : ''}`);
     setEl('relCnhVenc', `• ${venc} motorista${venc !== 1 ? 's' : ''}`);
 }
 
@@ -1213,6 +1281,7 @@ function configurarFiltros() {
     document.getElementById('searchFrota')?.addEventListener('input', renderizarFrota);
     document.getElementById('filterStatusFrota')?.addEventListener('change', renderizarFrota);
     document.getElementById('searchMotorista')?.addEventListener('input', renderizarMotoristas);
+    document.getElementById('filterStatusMotorista')?.addEventListener('change', renderizarMotoristas);
     document.getElementById('searchCliente')?.addEventListener('input', renderizarClientes);
     document.getElementById('filterStatusCliente')?.addEventListener('change', renderizarClientes);
     document.getElementById('searchRota')?.addEventListener('input', renderizarRotas);
@@ -1541,17 +1610,35 @@ function abrirModalControleVeiculo(id) {
     });
 }
 
-// 4. Modal: Motorista
+// 4. Modal: Motorista (Com controle Ativo/Inativo e trava de segurança em rotas ativas)
 function abrirModalMotorista(id = null) {
     const m = state.motoristas.find(item => item.id === id) || {
-        nome: '', telefone: '', cnh: '', categoria: 'D', validade: '2028-05-10'
+        nome: '', telefone: '', cnh: '', categoria: 'D', validade: '2028-05-10', status: 'Ativo'
     };
+    const statusAtual = m.status || 'Ativo';
+
+    // Verifica se o motorista está vinculado a alguma rota ativa (Em andamento ou Agendada)
+    const rotaAtivaDoMotorista = id
+        ? state.rotas.find(r => Number(r.motoristaId) === id && r.status !== 'Finalizada')
+        : null;
+    const clienteDaRota = rotaAtivaDoMotorista
+        ? state.clientes.find(c => c.id === Number(rotaAtivaDoMotorista.clienteId))
+        : null;
 
     abrirModal(id ? 'Editar Motorista' : 'Cadastrar Motorista', `
         <form id="formMotorista">
-            <div class="form-group">
-                <label>Nome Completo</label>
-                <input type="text" id="mNome" value="${m.nome}" required>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Nome Completo</label>
+                    <input type="text" id="mNome" value="${m.nome}" required>
+                </div>
+                <div class="form-group">
+                    <label>Status na Empresa</label>
+                    <select id="mStatus">
+                        <option value="Ativo" ${statusAtual === 'Ativo' ? 'selected' : ''}>Ativo</option>
+                        <option value="Inativo" ${statusAtual === 'Inativo' ? 'selected' : ''}>Inativo (Desligado)</option>
+                    </select>
+                </div>
             </div>
             <div class="grid-2">
                 <div class="form-group">
@@ -1576,6 +1663,7 @@ function abrirModalMotorista(id = null) {
                     <input type="date" id="mValidade" value="${m.validade}" required>
                 </div>
             </div>
+            <p class="error-msg" id="motoristaBlockError" style="display:none;"></p>
             <div class="modal-footer">
                 <button type="button" class="btn-secondary" onclick="fecharModal()">Cancelar</button>
                 <button type="submit" class="btn-primary">Salvar motorista</button>
@@ -1585,11 +1673,24 @@ function abrirModalMotorista(id = null) {
 
     document.getElementById('formMotorista').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const novoStatus = document.getElementById('mStatus').value;
+        const errEl = document.getElementById('motoristaBlockError');
+        errEl.style.display = 'none';
+
+        // TRAVA DE SEGURANÇA: Impede inativar motorista escalado em rota ativa
+        if (rotaAtivaDoMotorista && novoStatus === 'Inativo') {
+            const nomeCli = clienteDaRota ? clienteDaRota.empresa : 'Cliente';
+            errEl.textContent = `Ação bloqueada: Este motorista está vinculado à rota ativa (${rotaAtivaDoMotorista.status}) de "${nomeCli}". Substitua o motorista na aba Rotas ou finalize a rota antes de inativá-lo.`;
+            errEl.style.display = 'block';
+            return;
+        }
+
         const dados = {
-            nome: document.getElementById('mNome').value,
-            telefone: document.getElementById('mTel').value,
+            nome: document.getElementById('mNome').value.trim(),
+            status: novoStatus,
+            telefone: document.getElementById('mTel').value.trim(),
             categoria: document.getElementById('mCat').value,
-            cnh: document.getElementById('mCnh').value,
+            cnh: document.getElementById('mCnh').value.trim(),
             validade: document.getElementById('mValidade').value
         };
 
@@ -1681,7 +1782,7 @@ function abrirModalCliente(id = null) {
     });
 }
 
-// 6. Modal: Rotas
+// 6. Modal: Rotas (Filtra apenas motoristas Ativos, clientes Ativos e veículos Disponíveis)
 function abrirModalRota(id = null) {
     const clientePadrao = state.clientes.find(c => c.status === 'Ativo') || state.clientes[0];
 
@@ -1707,6 +1808,11 @@ function abrirModalRota(id = null) {
         return ehOVeiculoDestaRota || (v.status === 'Disponível' && estaLivre);
     });
 
+    // Lista apenas motoristas Ativos (ou o motorista atual caso esteja editando um histórico)
+    const motoristasElegiveis = state.motoristas.filter(m =>
+        (m.status || 'Ativo') === 'Ativo' || Number(r.motoristaId) === m.id
+    );
+
     abrirModal(id ? 'Editar Rota' : 'Nova Rota Operacional', `
         <form id="formRota">
             <div class="form-group">
@@ -1726,13 +1832,14 @@ function abrirModalRota(id = null) {
                 </select>
             </div>
             <div class="form-group">
-                <label>Motorista</label>
+                <label>Motorista (Apenas Ativos)</label>
                 <select id="rMotorista" required>
                     <option value="">Selecione o motorista...</option>
-                    ${state.motoristas.map(m => {
+                    ${motoristasElegiveis.map(m => {
                         const st = obterStatusCNH(m.validade);
+                        const inativoTag = m.status === 'Inativo' ? ' [INATIVO]' : '';
                         const aviso = st.bloqueadoRota ? ` [BLOQUEADO: ${st.motivo}]` : '';
-                        return `<option value="${m.id}" ${Number(r.motoristaId) === m.id ? 'selected' : ''}>${m.nome} (CNH ${m.categoria})${aviso}</option>`;
+                        return `<option value="${m.id}" ${Number(r.motoristaId) === m.id ? 'selected' : ''}>${m.nome} (CNH ${m.categoria})${inativoTag}${aviso}</option>`;
                     }).join('')}
                 </select>
             </div>
@@ -1783,6 +1890,7 @@ function abrirModalRota(id = null) {
 
         const motoristaId = Number(document.getElementById('rMotorista').value);
         const veiculoId = Number(document.getElementById('rVeiculo').value);
+        const statusRota = document.getElementById('rStatus').value;
         const mot = state.motoristas.find(m => m.id === motoristaId);
 
         if (!veiculoId) {
@@ -1791,8 +1899,21 @@ function abrirModalRota(id = null) {
             return;
         }
 
+        if (!mot) {
+            errEl.textContent = 'Selecione um motorista válido.';
+            errEl.style.display = 'block';
+            return;
+        }
+
+        // TRAVA: Impede manter ou criar rota ativa com motorista Inativo
+        if (mot.status === 'Inativo' && statusRota !== 'Finalizada') {
+            errEl.textContent = `Associação bloqueada: O motorista ${mot.nome} está Inativo (desligado da empresa) e não pode realizar rotas ativas.`;
+            errEl.style.display = 'block';
+            return;
+        }
+
         const statusCNH = obterStatusCNH(mot.validade);
-        if (statusCNH.bloqueadoRota) {
+        if (statusCNH.bloqueadoRota && statusRota !== 'Finalizada') {
             errEl.textContent = `Associação bloqueada: O motorista ${mot.nome} está com a ${statusCNH.motivo}.`;
             errEl.style.display = 'block';
             return;
@@ -1812,7 +1933,7 @@ function abrirModalRota(id = null) {
             return (horaInicio < outra.horaFim && horaFim > outra.horaInicio);
         });
 
-        if (conflitoMotorista) {
+        if (conflitoMotorista && statusRota !== 'Finalizada') {
             errEl.textContent = `Conflito de horário: O motorista ${mot.nome} já está alocado em outra rota entre ${conflitoMotorista.horaInicio} e ${conflitoMotorista.horaFim}.`;
             errEl.style.display = 'block';
             return;
@@ -1826,7 +1947,7 @@ function abrirModalRota(id = null) {
             periodo: document.getElementById('rPeriodo').value,
             horaInicio,
             horaFim,
-            status: document.getElementById('rStatus').value
+            status: statusRota
         };
 
         if (id) Object.assign(r, dados);

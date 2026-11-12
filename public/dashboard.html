@@ -289,7 +289,12 @@
                     <span>🔍</span>
                     <input type="text" id="searchMotorista" placeholder="Buscar por nome ou número da CNH...">
                 </div>
-                <span class="badge red" id="motAttentionBadge">• 3 habilitações requerem atenção</span>
+                <span class="badge red" id="motAttentionPill" style="padding: 7px 12px;">• 3 habilitações requerem atenção</span>
+                <select id="filterStatusMotorista" class="filter-select">
+                    <option value="Ativo">Apenas Ativos (Ocultar inativos)</option>
+                    <option value="Inativo">Apenas Inativos</option>
+                    <option value="Todos">Todos os motoristas</option>
+                </select>
             </div>
 
             <div class="table-card">
