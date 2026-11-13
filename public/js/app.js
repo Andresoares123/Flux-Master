@@ -317,7 +317,8 @@ async function carregarDados() {
         const res = await fetch('/api/dados');
         const serverData = await res.json();
 
-        if (serverData && serverData.veiculos && serverData.veiculos.length > 0) {
+        // Aceita o banco mesmo quando estiver com 0 veículos (iniciando do zero)
+        if (serverData && Array.isArray(serverData.veiculos)) {
             state = serverData;
             localStorage.setItem('lm_state_v1', JSON.stringify(state));
             return;
@@ -2052,7 +2053,7 @@ function abrirModalManutencao(id = null) {
     const hojeISO = obterDataHojeISO();
 
     const m = state.manutencoes.find(item => item.id === id) || {
-        placa: state.veiculos.find(v => v.status !== 'Vendido')?.placa || state.veiculos[0].placa,
+        placa: state.veiculos.find(v => v.status !== 'Vendido')?.placa || state.veiculos[0]?.placa || '',
         data: hojeISO,
         tipo: 'Preventiva',
         oficina: '',
