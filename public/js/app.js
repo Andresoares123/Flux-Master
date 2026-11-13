@@ -554,11 +554,15 @@ function renderizarNotificacoes() {
         }
     });
 
-    const badge = document.getElementById('notifCountBadge');
-    if (badge) {
+    const badgesSino = document.querySelectorAll(
+        '#notifCountBadge, #notifBadge, .notif-badge, .notif-count, #notifBtn span, #notifBtn sup, .notif-btn span'
+    );
+    badgesSino.forEach(badge => {
+        // Ignora caso o span seja o próprio ícone do sino (🔔)
+        if (badge.textContent.trim().includes('🔔')) return;
         badge.textContent = notificacoes.length;
         badge.style.display = notificacoes.length > 0 ? 'flex' : 'none';
-    }
+    });
 
     const alertBanner = document.getElementById('dashAlertBanner');
     const alertText = document.getElementById('dashAlertText');
