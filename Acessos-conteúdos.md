@@ -10,3 +10,9 @@ Diagrama de Classes
 Diagrama de Casos de Uso
 
 <img width="1000" height="1080" alt="Image" src="https://github.com/user-attachments/assets/04c33130-f303-435b-9a49-75b4e0471f8a" />
+
+
+Comando para limpar database pelo navegador: ---------------------
+Dentro da página aperte F12, depois vá em console e envie o seguinte comando:
+
+ state = { veiculos: [], motoristas: [], clientes: [], rotas: [], manutencoes: [] }; salvarEstado().then(() => location.reload());
