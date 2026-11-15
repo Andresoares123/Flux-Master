@@ -1011,7 +1011,7 @@ function renderizarMotoristas() {
             <tr style="${isInativo ? 'opacity: 0.72;' : ''}">
                 <td>
                     <strong>${m.nome}</strong>${badgeInativo}
-                    <small style="display:block; color:var(--text-muted); font-size:11.5px;">${m.telefone}</small>
+                    <small style="display:block; color:var(--text-muted); font-size:11.5px;">${m.telefone || 'Indefinido'}</small>
                 </td>
                 <td style="color:var(--text-muted);">${m.cnh}</td>
                 <td><strong>Categoria ${m.categoria}</strong></td>
@@ -1734,7 +1734,7 @@ function abrirModalMotorista(id = null) {
             <div class="grid-2">
                 <div class="form-group">
                     <label>Telefone</label>
-                    <input type="text" id="mTel" value="${m.telefone}" placeholder="(11) 99999-0000" required>
+                    <input type="text" id="mTel" value="${m.telefone || ''}" placeholder="(11) 99999-0000">
                 </div>
                 <div class="form-group">
                     <label>Categoria CNH</label>
