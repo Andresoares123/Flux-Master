@@ -5,7 +5,7 @@ Sistema de Gestão Inteligente para Transporte de Passageiros Corporativos
 
 Diagrama de Classes
 
-<img width="1000" height="889" alt="Image" src="https://github.com/user-attachments/assets/5f5b1329-6aa0-43d8-b781-e59005e7efb1" />
+<img width="956" height="766" alt="DIAGRAMA DE CLASSES" src="https://github.com/user-attachments/assets/707fb298-4dab-4ee7-b184-776e222f5789" />
 
 Diagrama de Casos de Uso
 
