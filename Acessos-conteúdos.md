@@ -9,7 +9,7 @@ Diagrama de Classes
 
 Diagrama de Casos de Uso
 
-<img width="1000" height="1080" alt="Image" src="https://github.com/user-attachments/assets/04c33130-f303-435b-9a49-75b4e0471f8a" />
+<img width="1128" height="1599" alt="diagrama caso de uso" src="https://github.com/user-attachments/assets/d31204df-a8e8-4c29-9421-f017ce97ddcc" />
 
 
 Comando para limpar database pelo navegador: ---------------------
