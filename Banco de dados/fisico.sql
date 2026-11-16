@@ -1,10 +1,12 @@
-/* Lógico_1: */
+/* Lógico_1 2.0: */
 
 CREATE TABLE USUARIO (
     id_usuario INTEGER PRIMARY KEY,
     nome VARCHAR,
     senha VARCHAR,
-    tema_preferido VARCHAR
+    tema_preferido VARCHAR,
+    login VARCHAR,
+    perfil VARCHAR
 );
 
 CREATE TABLE VEICULO (
@@ -15,7 +17,8 @@ CREATE TABLE VEICULO (
     capacidade INTEGER,
     status VARCHAR,
     km_atual INTEGER,
-    km_proxima_troca INTEGER
+    km_proxima_troca INTEGER,
+    FK_USUARIO_id_usuario INTEGER
 );
 
 CREATE TABLE DOCUMENTO_VEICULAR (
@@ -33,7 +36,9 @@ CREATE TABLE MOTORISTA (
     numero_cnh VARCHAR,
     categoria_cnh VARCHAR,
     validade_cnh DATE,
-    status_cnh VARCHAR
+    status_cnh VARCHAR,
+    status VARCHAR,
+    telefone VARCHAR
 );
 
 CREATE TABLE CLIENTE (
@@ -42,16 +47,19 @@ CREATE TABLE CLIENTE (
     nome_contato VARCHAR,
     telefone VARCHAR,
     observacao VARCHAR,
-    status VARCHAR
+    status VARCHAR,
+    rotas_realizadas INTEGER
 );
 
 CREATE TABLE MANUTENCAO (
     id_manutencao INTEGER PRIMARY KEY,
     data_servico DATE,
     tipo_servico VARCHAR,
-    oficina_observacao VARCHAR,
+    oficina VARCHAR,
     custo DECIMAL,
     status VARCHAR,
+    observacao VARCHAR,
+    codigo INTEGER,
     FK_VEICULO_id_veiculo INTEGER
 );
 
@@ -67,15 +75,20 @@ CREATE TABLE ROTA (
     FK_VEICULO_id_veiculo INTEGER
 );
  
+ALTER TABLE VEICULO ADD CONSTRAINT FK_VEICULO_2
+    FOREIGN KEY (FK_USUARIO_id_usuario)
+    REFERENCES USUARIO (id_usuario)
+    ON DELETE CASCADE;
+ 
 ALTER TABLE DOCUMENTO_VEICULAR ADD CONSTRAINT FK_DOCUMENTO_VEICULAR_2
     FOREIGN KEY (FK_VEICULO_id_veiculo)
     REFERENCES VEICULO (id_veiculo)
-    ON DELETE RESTRICT;
+    ON DELETE CASCADE;
  
 ALTER TABLE MANUTENCAO ADD CONSTRAINT FK_MANUTENCAO_2
     FOREIGN KEY (FK_VEICULO_id_veiculo)
     REFERENCES VEICULO (id_veiculo)
-    ON DELETE RESTRICT;
+    ON DELETE CASCADE;
  
 ALTER TABLE ROTA ADD CONSTRAINT FK_ROTA_2
     FOREIGN KEY (FK_CLIENTE_id_cliente)
