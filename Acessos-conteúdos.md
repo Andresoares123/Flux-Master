@@ -5,11 +5,11 @@ Sistema de Gestão Inteligente para Transporte de Passageiros Corporativos
 
 Diagrama de Classes
 
-<img width="1000" height="889" alt="Image" src="https://github.com/user-attachments/assets/5f5b1329-6aa0-43d8-b781-e59005e7efb1" />
+<img width="956" height="766" alt="DIAGRAMA DE CLASSES" src="https://github.com/user-attachments/assets/707fb298-4dab-4ee7-b184-776e222f5789" />
 
 Diagrama de Casos de Uso
 
-<img width="1000" height="1080" alt="Image" src="https://github.com/user-attachments/assets/04c33130-f303-435b-9a49-75b4e0471f8a" />
+<img width="1128" height="1599" alt="diagrama caso de uso" src="https://github.com/user-attachments/assets/d31204df-a8e8-4c29-9421-f017ce97ddcc" />
 
 
 Comando para limpar database pelo navegador: ---------------------
